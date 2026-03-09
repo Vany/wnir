@@ -16,7 +16,7 @@ public final class SpawnerAccessor {
     private static volatile Field rangeField;
     private static volatile Field minDelayField;
     private static volatile Field maxDelayField;
-    private static boolean probed;
+    private static volatile boolean probed;
 
     static {
         rangeField = findByName("requiredPlayerRange");

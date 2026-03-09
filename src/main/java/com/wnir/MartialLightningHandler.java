@@ -79,34 +79,13 @@ public class MartialLightningHandler {
         }
     }
 
-    private static void applySecondaryEffect(
-        LivingEntity target,
-        Player player,
-        ToolCategory category
-    ) {
+    private static void applySecondaryEffect(LivingEntity target, Player player, ToolCategory category) {
         switch (category) {
-            case WOODEN:
-                target.addEffect(
-                    new MobEffectInstance(
-                        MobEffects.POISON,
-                        POISON_DURATION_TICKS,
-                        POISON_AMPLIFIER
-                    ),
-                    player
-                );
-                break;
-            case STONE:
-                target.addEffect(
-                    new MobEffectInstance(
-                        MobEffects.WITHER,
-                        WITHER_DURATION_TICKS,
-                        WITHER_AMPLIFIER
-                    ),
-                    player
-                );
-                break;
-            default:
-                break;
+            case WOODEN -> target.addEffect(
+                new MobEffectInstance(MobEffects.POISON, POISON_DURATION_TICKS, POISON_AMPLIFIER), player);
+            case STONE -> target.addEffect(
+                new MobEffectInstance(MobEffects.WITHER, WITHER_DURATION_TICKS, WITHER_AMPLIFIER), player);
+            default -> {}
         }
     }
 

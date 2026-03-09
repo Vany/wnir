@@ -1,7 +1,5 @@
 package com.wnir;
 
-import net.minecraft.core.Holder;
-import net.minecraft.core.component.DataComponents;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.resources.Identifier;
 import net.minecraft.resources.ResourceKey;
@@ -9,9 +7,7 @@ import net.minecraft.world.entity.ai.attributes.AttributeInstance;
 import net.minecraft.world.entity.ai.attributes.AttributeModifier;
 import net.minecraft.world.entity.ai.attributes.Attributes;
 import net.minecraft.world.entity.player.Player;
-import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.enchantment.Enchantment;
-import net.minecraft.world.item.enchantment.ItemEnchantments;
 import net.neoforged.neoforge.event.tick.PlayerTickEvent;
 
 /**
@@ -26,10 +22,10 @@ import net.neoforged.neoforge.event.tick.PlayerTickEvent;
 public final class SwiftStrikeHandler {
 
     static final ResourceKey<Enchantment> KEY =
-        ResourceKey.create(Registries.ENCHANTMENT, Identifier.fromNamespaceAndPath(WnirMod.MOD_ID, "swift_strike"));
+        ResourceKey.create(Registries.ENCHANTMENT, WnirRegistries.id("swift_strike"));
 
     private static final Identifier MODIFIER_ID =
-        Identifier.fromNamespaceAndPath(WnirMod.MOD_ID, "swift_strike");
+        WnirRegistries.id("swift_strike");
 
     private static final double[] MULT = { 1.0 / 3.0, 1.0, 3.0 };
 
@@ -42,7 +38,7 @@ public final class SwiftStrikeHandler {
         AttributeInstance attr = player.getAttribute(Attributes.ATTACK_SPEED);
         if (attr == null) return;
 
-        int level = getLevel(player.getMainHandItem());
+        int level = WnirEnchantments.getLevel(player.getMainHandItem(), KEY);
         attr.removeModifier(MODIFIER_ID);
         if (level > 0) {
             attr.addTransientModifier(new AttributeModifier(
@@ -53,13 +49,4 @@ public final class SwiftStrikeHandler {
         }
     }
 
-    private static int getLevel(ItemStack stack) {
-        ItemEnchantments enc = stack.getOrDefault(DataComponents.ENCHANTMENTS, ItemEnchantments.EMPTY);
-        for (Holder<Enchantment> holder : enc.keySet()) {
-            if (holder.is(KEY)) {
-                return enc.getLevel(holder);
-            }
-        }
-        return 0;
-    }
 }

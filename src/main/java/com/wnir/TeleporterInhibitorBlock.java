@@ -20,11 +20,11 @@ public class TeleporterInhibitorBlock extends WardingColumnBaseBlock {
 
     @Override
     protected Supplier<BlockEntityType<? extends WardingColumnBlockEntity>> beTypeSupplier() {
-        return WnirRegistries.TELEPORTER_INHIBITOR_BE::get;
+        return WnirRegistries.WARDING_COLUMN_BLOCK_ENTITY::get;
     }
 
     @Override
     public BlockEntity newBlockEntity(BlockPos pos, BlockState state) {
-        return new TeleporterInhibitorBlockEntity(pos, state);
+        return WardingColumnBlockEntity.create(pos, state);
     }
 }

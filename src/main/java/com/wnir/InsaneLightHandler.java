@@ -30,7 +30,7 @@ public final class InsaneLightHandler {
     private static final int EFFECT_DURATION = 100;
 
     private static final Identifier RANGE_BOOST_ID =
-        Identifier.fromNamespaceAndPath(WnirMod.MOD_ID, "insane_light_range");
+        WnirRegistries.id("insane_light_range");
 
     public static void onPlayerTick(PlayerTickEvent.Post event) {
         Player player = event.getEntity();

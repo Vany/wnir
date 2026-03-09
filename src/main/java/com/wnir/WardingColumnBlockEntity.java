@@ -27,7 +27,7 @@ import net.minecraft.world.phys.Vec3;
  *   - RepellingPostBlock:       +4 (radius + mob push)
  *   - TeleporterInhibitorBlock: +4 (radius + teleport block)
  */
-public abstract class WardingColumnBlockEntity extends BlockEntity {
+public class WardingColumnBlockEntity extends BlockEntity {
 
     static final double VERTICAL_RANGE  = 2.5;
     static final double PUSH_STRENGTH   = 0.5;
@@ -50,10 +50,15 @@ public abstract class WardingColumnBlockEntity extends BlockEntity {
 
     private int tickCounter;
 
-    protected WardingColumnBlockEntity(
+    public WardingColumnBlockEntity(
         BlockEntityType<?> type, BlockPos pos, BlockState state
     ) {
         super(type, pos, state);
+    }
+
+    /** Factory for BlockEntityType registration (defers type lookup). */
+    static WardingColumnBlockEntity create(BlockPos pos, BlockState state) {
+        return new WardingColumnBlockEntity(WnirRegistries.WARDING_COLUMN_BLOCK_ENTITY.get(), pos, state);
     }
 
     // ── Inhibitor registry (for O(n) teleport checks) ────────────────────

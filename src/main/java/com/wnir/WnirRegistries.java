@@ -80,14 +80,18 @@ public final class WnirRegistries {
         Supplier<BlockEntityType<E>> entity
     ) {}
 
+    static Identifier id(String name) {
+        return Identifier.fromNamespaceAndPath(WnirMod.MOD_ID, name);
+    }
+
     private static <B extends Block, E extends BlockEntity> BlockBundle<B, E> registerBlock(
         String name,
         Function<BlockBehaviour.Properties, B> blockFactory,
         BlockEntityType.BlockEntitySupplier<E> entityFactory,
         BlockBehaviour.Properties props
     ) {
-        var blockKey = ResourceKey.create(Registries.BLOCK, Identifier.fromNamespaceAndPath(WnirMod.MOD_ID, name));
-        var itemKey  = ResourceKey.create(Registries.ITEM,  Identifier.fromNamespaceAndPath(WnirMod.MOD_ID, name));
+        var blockKey = ResourceKey.create(Registries.BLOCK, id(name));
+        var itemKey  = ResourceKey.create(Registries.ITEM,  id(name));
 
         Supplier<B> block = BLOCKS.register(name, () -> blockFactory.apply(props.setId(blockKey)));
         Supplier<BlockItem> item = ITEMS.register(name, () ->
@@ -106,8 +110,8 @@ public final class WnirRegistries {
         Function<BlockBehaviour.Properties, B> blockFactory,
         BlockBehaviour.Properties props
     ) {
-        var blockKey = ResourceKey.create(Registries.BLOCK, Identifier.fromNamespaceAndPath(WnirMod.MOD_ID, name));
-        var itemKey  = ResourceKey.create(Registries.ITEM,  Identifier.fromNamespaceAndPath(WnirMod.MOD_ID, name));
+        var blockKey = ResourceKey.create(Registries.BLOCK, id(name));
+        var itemKey  = ResourceKey.create(Registries.ITEM,  id(name));
 
         Supplier<B> block = BLOCKS.register(name, () -> blockFactory.apply(props.setId(blockKey)));
         Supplier<BlockItem> item = ITEMS.register(name, () ->
@@ -118,25 +122,32 @@ public final class WnirRegistries {
 
     // ── Block instances ──────────────────────────────────────────────────
 
-    private static final BlockBundle<ChunkLoaderBlock, ChunkLoaderBlockEntity> CHUNK_LOADER =
-        registerBlock("chunk_loader", ChunkLoaderBlock::new, ChunkLoaderBlockEntity::new,
+    private static final SimpleBlockBundle<ChunkLoaderBlock> CHUNK_LOADER =
+        registerSimpleBlock("chunk_loader", ChunkLoaderBlock::new,
             BlockBehaviour.Properties.of().mapColor(MapColor.COLOR_GREEN).sound(SoundType.METAL));
 
     private static final BlockBundle<SpawnerAgitatorBlock, SpawnerAgitatorBlockEntity> SPAWNER_AGITATOR =
         registerBlock("spawner_agitator", SpawnerAgitatorBlock::new, SpawnerAgitatorBlockEntity::new,
             BlockBehaviour.Properties.of().mapColor(MapColor.COLOR_YELLOW).sound(SoundType.METAL).randomTicks());
 
-    private static final BlockBundle<WardingPostBlock, WardingPostBlockEntity> WARDING_POST =
-        registerBlock("warding_post", WardingPostBlock::new, WardingPostBlockEntity::new,
+    private static final SimpleBlockBundle<WardingPostBlock> WARDING_POST =
+        registerSimpleBlock("warding_post", WardingPostBlock::new,
             BlockBehaviour.Properties.of().mapColor(MapColor.STONE).sound(SoundType.STONE).strength(0.1f).noOcclusion().randomTicks());
 
-    private static final BlockBundle<TeleporterInhibitorBlock, TeleporterInhibitorBlockEntity> TELEPORTER_INHIBITOR =
-        registerBlock("teleporter_inhibitor", TeleporterInhibitorBlock::new, TeleporterInhibitorBlockEntity::new,
+    private static final SimpleBlockBundle<TeleporterInhibitorBlock> TELEPORTER_INHIBITOR =
+        registerSimpleBlock("teleporter_inhibitor", TeleporterInhibitorBlock::new,
             BlockBehaviour.Properties.of().mapColor(MapColor.COLOR_PURPLE).sound(SoundType.AMETHYST).strength(0.1f).noOcclusion().randomTicks());
 
-    private static final BlockBundle<RepellingPostBlock, RepellingPostBlockEntity> REPELLING_POST =
-        registerBlock("repelling_post", RepellingPostBlock::new, RepellingPostBlockEntity::new,
+    private static final SimpleBlockBundle<RepellingPostBlock> REPELLING_POST =
+        registerSimpleBlock("repelling_post", RepellingPostBlock::new,
             BlockBehaviour.Properties.of().mapColor(MapColor.COLOR_ORANGE).sound(SoundType.BONE_BLOCK).strength(0.1f).noOcclusion().randomTicks());
+
+    /** Single shared BE type for all warding column blocks. */
+    private static final Supplier<BlockEntityType<WardingColumnBlockEntity>> WARDING_COLUMN_BE =
+        BLOCK_ENTITIES.register("warding_column", () -> {
+            Set<Block> blocks = Set.of(WARDING_POST.block.get(), TELEPORTER_INHIBITOR.block.get(), REPELLING_POST.block.get());
+            return new BlockEntityType<>(WardingColumnBlockEntity::create, blocks);
+        });
 
     private static final BlockBundle<EEClockBlock, EEClockBlockEntity> EE_CLOCK =
         registerBlock("ee_clock", EEClockBlock::new, EEClockBlockEntity::new,
@@ -152,11 +163,8 @@ public final class WnirRegistries {
 
     // ── Public accessors ─────────────────────────────────────────────────
 
-    public static final Supplier<BlockEntityType<ChunkLoaderBlockEntity>> CHUNK_LOADER_BE = CHUNK_LOADER.entity;
     public static final Supplier<BlockEntityType<SpawnerAgitatorBlockEntity>> SPAWNER_AGITATOR_BE = SPAWNER_AGITATOR.entity;
-    public static final Supplier<BlockEntityType<WardingPostBlockEntity>> WARDING_POST_BE = WARDING_POST.entity;
-    public static final Supplier<BlockEntityType<TeleporterInhibitorBlockEntity>> TELEPORTER_INHIBITOR_BE = TELEPORTER_INHIBITOR.entity;
-    public static final Supplier<BlockEntityType<RepellingPostBlockEntity>> REPELLING_POST_BE = REPELLING_POST.entity;
+    public static final Supplier<BlockEntityType<WardingColumnBlockEntity>> WARDING_COLUMN_BLOCK_ENTITY = WARDING_COLUMN_BE;
     public static final Supplier<BlockEntityType<EEClockBlockEntity>> EE_CLOCK_BE = EE_CLOCK.entity;
 
     public static final Supplier<BlockItem> CHUNK_LOADER_ITEM = CHUNK_LOADER.item;

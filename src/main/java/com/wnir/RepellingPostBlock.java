@@ -20,11 +20,11 @@ public class RepellingPostBlock extends WardingColumnBaseBlock {
 
     @Override
     protected Supplier<BlockEntityType<? extends WardingColumnBlockEntity>> beTypeSupplier() {
-        return WnirRegistries.REPELLING_POST_BE::get;
+        return WnirRegistries.WARDING_COLUMN_BLOCK_ENTITY::get;
     }
 
     @Override
     public BlockEntity newBlockEntity(BlockPos pos, BlockState state) {
-        return new RepellingPostBlockEntity(pos, state);
+        return WardingColumnBlockEntity.create(pos, state);
     }
 }
