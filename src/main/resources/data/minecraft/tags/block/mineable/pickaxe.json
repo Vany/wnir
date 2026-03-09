@@ -4,6 +4,7 @@
     "wnir:chunk_loader",
     "wnir:spawner_agitator",
     "wnir:warding_post",
-    "wnir:antiwither"
+    "wnir:antiwither",
+    "wnir:mossy_hopper"
   ]
 }

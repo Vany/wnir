@@ -20,8 +20,9 @@
 - [x] Accelerate enchantment
 - [x] Toughness enchantment
 - [x] Mega Chanter potion (Awkward + Book)
-- [x] Enchanted weapons in dungeon loot
-- [x] Enchantment books in dungeon loot
+- [x] Mossy Hopper block
+- [~] Enchanted weapons in dungeon loot — REMOVED (loot modifier conditions broken in 1.21.11; enchants available at enchanting table only)
+- [~] Enchantment books in dungeon loot — REMOVED (same reason)
 - [x] EE Clock in End City loot
 - [x] Warding Post in dungeon loot
 
@@ -163,6 +164,32 @@ Column block that accelerates a block-entity machine. N clocks → N extra ticks
 **Loot:** End City treasure chests (weight 5, empty weight 10).
 
 **Texture:** `cube_bottom_top` model with `ee_clock_top`, `ee_clock_bottom`, `ee_clock_side`.
+
+---
+
+### Mossy Hopper (`wnir:mossy_hopper`)
+
+Item sorter hopper. Extends `HopperBlock` / `RandomizableContainerBlockEntity`.
+
+**Slots:** 10 (two rows of 5). GUI opens on right-click.
+
+**Transfer logic (every 8 ticks):**
+- Pull from above via `HopperBlockEntity.suckInItems()`
+- Push 2 items per cycle into the block in its facing direction
+- **Never ejects the last item in a stack** — only pushes from slots where `count > 1`
+- If only one eligible slot, both transfers come from it
+- Slot selection is random among eligible slots each transfer
+
+**GUI:**
+- `MossyHopperMenu` — 10 hopper slots (rows at y=20 and y=38) + standard player inventory (y=64) + hotbar (y=122). `IMAGE_HEIGHT = 149`.
+- `MossyHopperScreen` — renders `wnir:textures/gui/container/mossy_hopper.png` (256×256, assembled from vanilla hopper slices; content occupies top-left 176×149 pixels).
+- Screen registered in `WnirClientSetup` via `RegisterMenuScreensEvent`.
+
+**Recipe:** shaped — `"M M" / "MHM" / " M "`, M = mossy cobblestone, H = hopper → 1 mossy hopper. Category: redstone.
+
+**Properties:** stone map color, metal sound, strength 3.0, `requiresCorrectToolForDrops()`, `noOcclusion()`. Listed in `minecraft:mineable/pickaxe` tag.
+
+**Model:** parent `minecraft:block/hopper` with all texture variables set to `minecraft:block/mossy_cobblestone`.
 
 ---
 
@@ -327,7 +354,7 @@ Applied via transient modifier on `PlayerTickEvent.Post`.
 
 Tab ID: `wnir:wnir`. Title: "When Nothing Is Ready". Icon: chunk_loader.
 
-Contains: chunk_loader, spawner_agitator, warding_post, teleporter_inhibitor, repelling_post, antiwither, ee_clock.
+Contains: chunk_loader, spawner_agitator, warding_post, teleporter_inhibitor, repelling_post, antiwither, ee_clock, mossy_hopper.
 
 ---
 
@@ -350,6 +377,13 @@ Contains: chunk_loader, spawner_agitator, warding_post, teleporter_inhibitor, re
 14. **EE Clock extra-ticks approach** — calls the machine's own `BlockEntityTicker.tick()` N extra times per game tick. Works with any vanilla or modded machine without cooperation (same approach as Draconic Evolution).
 15. **Splash/lingering Mega Chanter potions allowed** — vanilla brewing chain produces them naturally; no lock-out intentional.
 16. **`on_mob_spawn_equipment` tag** — pure JSON, no Java; simpler than a custom loot modifier.
+17. **GUI blit API (1.21.11):** `g.blit(RenderPipelines.GUI_TEXTURED, Identifier, x, y, uPixel, vPixel, width, height, texW, texH)`. Old 7-param shorthand removed. Texture must be 256×256; u/v are pixel offsets.
+18. **Block mineable tag required:** `requiresCorrectToolForDrops()` only gates drops; actual tool-speed and breakability require the block to be in `data/minecraft/tags/block/mineable/pickaxe.json` (or axe/shovel etc.).
+19. **NBT API (1.21.11):** `loadAdditional(ValueInput)` / `saveAdditional(ValueOutput)` — no `HolderLookup.Provider`. Use `input.getIntOr(key, default)` and `output.putInt(key, val)`. `ContainerHelper.loadAllItems(ValueInput, NonNullList)`.
+20. **`@EventBusSubscriber.bus()` ignored in NeoForge FML 4** — event bus routing is automatic via `IModBusEvent` interface; omit the `bus` parameter entirely.
+21. **MapCodec covariant override:** subclass of `HopperBlock` cannot return `MapCodec<SubType>` — cast via `(MapCodec<HopperBlock>)(MapCodec<?>) CODEC` with `@SuppressWarnings("unchecked")`.
+22. **Recipe key format:** use plain string `"M": "minecraft:item"` not object `"M": {"item": "..."}` — both valid in spec but plain string matches vanilla/working examples in this codebase.
+23. **Loot modifier conditions broken:** `neoforge:loot_table_id` conditions in global loot modifiers may not filter correctly in 1.21.11 — modifier fires on all loot tables. Removed all enchantment-via-loot machinery; enchants available at enchanting table only.
 
 ---
 
@@ -357,6 +391,6 @@ Contains: chunk_loader, spawner_agitator, warding_post, teleporter_inhibitor, re
 
 - Automated tests
 - Client-side rendering (custom block entity renderers)
-- GUI / screen for any block
+- GUI / screen for any block except Mossy Hopper (which has one)
 - Cross-mod API / capability integration
 - Config file (no user-configurable parameters currently)

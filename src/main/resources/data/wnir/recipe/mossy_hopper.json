@@ -1,0 +1,17 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "category": "redstone",
+  "pattern": [
+    "M M",
+    "MHM",
+    " M "
+  ],
+  "key": {
+    "M": "minecraft:mossy_cobblestone",
+    "H": "minecraft:hopper"
+  },
+  "result": {
+    "id": "wnir:mossy_hopper",
+    "count": 1
+  }
+}

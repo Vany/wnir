@@ -15,7 +15,10 @@ import net.minecraft.world.item.BlockItem;
 import net.minecraft.world.item.CreativeModeTab;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.alchemy.Potion;
+import net.minecraft.world.flag.FeatureFlags;
+import net.minecraft.world.inventory.MenuType;
 import net.minecraft.world.level.block.Block;
+import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.SoundType;
 import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.block.entity.BlockEntityType;
@@ -73,6 +76,13 @@ public final class WnirRegistries {
 
     private static final DeferredRegister<CreativeModeTab> CREATIVE_TABS =
         DeferredRegister.create(BuiltInRegistries.CREATIVE_MODE_TAB, WnirMod.MOD_ID);
+
+    @SuppressWarnings("unchecked")
+    private static final DeferredRegister<MenuType<?>> MENU_TYPES =
+        DeferredRegister.create(
+            (net.minecraft.core.Registry<MenuType<?>>) (net.minecraft.core.Registry<?>) BuiltInRegistries.MENU,
+            WnirMod.MOD_ID
+        );
 
     private record BlockBundle<B extends Block, E extends BlockEntity>(
         Supplier<B> block,
@@ -153,6 +163,15 @@ public final class WnirRegistries {
         registerBlock("ee_clock", EEClockBlock::new, EEClockBlockEntity::new,
             BlockBehaviour.Properties.of().mapColor(MapColor.COLOR_CYAN).sound(SoundType.METAL).randomTicks());
 
+    private static final BlockBundle<MossyHopperBlock, MossyHopperBlockEntity> MOSSY_HOPPER =
+        registerBlock("mossy_hopper", MossyHopperBlock::new, MossyHopperBlockEntity::new,
+            BlockBehaviour.Properties.of()
+                .mapColor(MapColor.STONE)
+                .requiresCorrectToolForDrops()
+                .strength(3.0f)
+                .sound(SoundType.METAL)
+                .noOcclusion());
+
     private static final SimpleBlockBundle<AntiWitherBlock> ANTI_WITHER =
         registerSimpleBlock("antiwither", AntiWitherBlock::new,
             BlockBehaviour.Properties.of()
@@ -162,6 +181,12 @@ public final class WnirRegistries {
                 .strength(50f, 3_600_000f));
 
     // ── Public accessors ─────────────────────────────────────────────────
+
+    public static final Supplier<MenuType<MossyHopperMenu>> MOSSY_HOPPER_MENU =
+        MENU_TYPES.register("mossy_hopper", () -> new MenuType<>(MossyHopperMenu::new, FeatureFlags.VANILLA_SET));
+
+    public static final Supplier<BlockEntityType<MossyHopperBlockEntity>> MOSSY_HOPPER_BE = MOSSY_HOPPER.entity;
+    public static final Supplier<BlockItem> MOSSY_HOPPER_ITEM = MOSSY_HOPPER.item;
 
     public static final Supplier<BlockEntityType<SpawnerAgitatorBlockEntity>> SPAWNER_AGITATOR_BE = SPAWNER_AGITATOR.entity;
     public static final Supplier<BlockEntityType<WardingColumnBlockEntity>> WARDING_COLUMN_BLOCK_ENTITY = WARDING_COLUMN_BE;
@@ -191,6 +216,7 @@ public final class WnirRegistries {
                     output.accept(REPELLING_POST_ITEM.get());
                     output.accept(ANTI_WITHER_ITEM.get());
                     output.accept(EE_CLOCK_ITEM.get());
+                    output.accept(MOSSY_HOPPER_ITEM.get());
                 })
                 .build()
         );
@@ -203,6 +229,7 @@ public final class WnirRegistries {
         BLOCKS.register(modEventBus);
         ITEMS.register(modEventBus);
         BLOCK_ENTITIES.register(modEventBus);
+        MENU_TYPES.register(modEventBus);
         CREATIVE_TABS.register(modEventBus);
     }
 }

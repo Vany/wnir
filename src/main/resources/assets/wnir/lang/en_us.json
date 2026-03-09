@@ -26,5 +26,8 @@
   "item.minecraft.potion.effect.mega_chanter": "Potion of Mega Chanting",
   "item.minecraft.splash_potion.effect.mega_chanter": "Splash Potion of Mega Chanting",
   "item.minecraft.lingering_potion.effect.mega_chanter": "Lingering Potion of Mega Chanting",
-  "item.minecraft.tipped_arrow.effect.mega_chanter": "Arrow of Mega Chanting"
+  "item.minecraft.tipped_arrow.effect.mega_chanter": "Arrow of Mega Chanting",
+  "block.wnir.mossy_hopper": "Mossy Hopper",
+  "item.wnir.mossy_hopper": "Mossy Hopper",
+  "container.wnir.mossy_hopper": "Mossy Hopper"
 }

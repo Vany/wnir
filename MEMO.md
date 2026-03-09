@@ -30,6 +30,15 @@ Deploy: `make build`, then copy jar from `build/libs/` to test instance.
 | neighborChanged | Takes `Orientation` (not `BlockPos`) — not currently overridden |
 | Food detection | `DataComponents.FOOD` component (not `getFoodProperties()`) |
 | Player from event | `event.getEntity()` (not `getPlayer()`) |
+| GUI background blit | `g.blit(RenderPipelines.GUI_TEXTURED, Identifier, x, y, uPixel, vPixel, width, height, texW, texH)` — old 7-param overload removed |
+| NBT load/save | `loadAdditional(ValueInput)` / `saveAdditional(ValueOutput)` — no HolderLookup param |
+| ValueInput int | `input.getIntOr("key", defaultValue)` (not `getInt().orElse()`) |
+| ContainerHelper | `ContainerHelper.loadAllItems(ValueInput, list)` / `saveAllItems(ValueOutput, list)` |
+| Block breaking tool | `requiresCorrectToolForDrops()` only gates drops; add block to `data/minecraft/tags/block/mineable/pickaxe.json` for actual pickaxe speed/breakability |
+| `@EventBusSubscriber` | `.bus()` parameter ignored in NeoForge FML 4 — omit it; routing is automatic via `IModBusEvent` |
+| `Level.isClientSide` | Private field — use `level.isClientSide()` method |
+| MapCodec covariant | Subclass of HopperBlock: `(MapCodec<HopperBlock>)(MapCodec<?>) SUBTYPE_CODEC` + `@SuppressWarnings("unchecked")` |
+| MenuType | `new MenuType<>(MenuClass::new, FeatureFlags.VANILLA_SET)` |
 
 ## Architecture Notes
 
@@ -47,6 +56,10 @@ Deploy: `make build`, then copy jar from `build/libs/` to test instance.
 - **AccelerateHandler** — scales arrow velocity on `EntityJoinLevelEvent`.
 - **HomingArcheryHandler** — cancels arrow, spawns `ShulkerBullet`; tracks damage via `ConcurrentHashMap<UUID, TrackedBullet>` (stale entries cleaned after 60s).
 - **InsaneLightHandler** — 2× mob `FOLLOW_RANGE` via `ADD_MULTIPLIED_BASE + 1.0`; refreshed every 40 ticks.
+
+## New Blocks Added
+
+- **MossyHopperBlock** — extends `HopperBlock`. 10-slot sorter hopper. `MossyHopperBlockEntity` extends `RandomizableContainerBlockEntity`, implements `Hopper`. Never ejects last item. 2 items/8 ticks from random eligible slots. GUI via `MossyHopperMenu` + `MossyHopperScreen`. Client setup in `WnirClientSetup` (`@EventBusSubscriber`, `RegisterMenuScreensEvent`).
 
 ## Known Limitations / Issues
 
