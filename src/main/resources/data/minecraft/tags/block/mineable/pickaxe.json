@@ -1,0 +1,9 @@
+{
+  "replace": false,
+  "values": [
+    "wnir:chunk_loader",
+    "wnir:spawner_agitator",
+    "wnir:warding_post",
+    "wnir:antiwither"
+  ]
+}

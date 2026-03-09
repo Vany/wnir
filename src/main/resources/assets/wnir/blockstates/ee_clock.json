@@ -1,0 +1,5 @@
+{
+  "variants": {
+    "": { "model": "wnir:block/ee_clock" }
+  }
+}

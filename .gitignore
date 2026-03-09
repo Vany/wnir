@@ -1,0 +1,25 @@
+# Gradle
+.gradle/
+build/
+out/
+
+# IDE
+.idea/
+*.iml
+*.iws
+*.ipr
+.vscode/
+*.class
+
+# NeoForge / Minecraft dev
+run/
+runs/
+src/main/generated/
+src/test/generated/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Gradle wrapper (keep gradlew scripts, ignore jar)
+!gradle/wrapper/gradle-wrapper.jar

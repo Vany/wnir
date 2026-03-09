@@ -1,0 +1,20 @@
+{
+  "replace": false,
+  "entries": [
+    "wnir:add_bastion_bridge_loot",
+    "wnir:add_bastion_hoglin_loot",
+    "wnir:add_bastion_other_loot",
+    "wnir:add_bastion_treasure_loot",
+    "wnir:add_dungeon_simple_loot",
+    "wnir:add_dungeon_mineshaft_loot",
+    "wnir:add_fortress_loot",
+    "wnir:add_dungeon_stronghold_corridor_loot",
+    "wnir:add_dungeon_stronghold_crossing_loot",
+    "wnir:add_dungeon_desert_pyramid_loot",
+    "wnir:add_dungeon_jungle_temple_loot",
+    "wnir:add_end_city_loot",
+    "wnir:add_enchanted_weapons_loot",
+    "wnir:add_enchantment_books_loot",
+    "wnir:enchant_mob_drops"
+  ]
+}

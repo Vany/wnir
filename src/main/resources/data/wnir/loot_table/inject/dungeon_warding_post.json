@@ -1,0 +1,14 @@
+{
+  "type": "minecraft:chest",
+  "pools": [
+    {
+      "rolls": 1,
+      "entries": [
+        {"type": "minecraft:item", "name": "wnir:warding_post",         "weight": 3},
+        {"type": "minecraft:item", "name": "wnir:repelling_post",        "weight": 3},
+        {"type": "minecraft:item", "name": "wnir:teleporter_inhibitor",  "weight": 3},
+        {"type": "minecraft:empty", "weight": 11}
+      ]
+    }
+  ]
+}
