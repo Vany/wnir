@@ -64,6 +64,8 @@ Force-loads its chunk permanently. Positions survive server restarts via `ChunkL
 | Server start | `ChunkLoaderData.forceAll(level)` — re-force all saved positions |
 | Server stop | `ChunkLoaderData.reset()` — clear singleton (chunks unforce naturally) |
 
+**Acquisition:** no crafting recipe — found only in dungeon loot (Overworld structures).
+
 **ChunkLoaderData:** plain text file `wnir_chunk_loaders_<dim>.txt` in world save directory. One `X Y Z` per line. Atomic save: write `.tmp` then `Files.move(ATOMIC_MOVE)`. Per-dimension instances, loaded lazily. Migration from legacy single file on first load.
 
 ---
@@ -88,6 +90,8 @@ Column placed below vanilla mob spawners. Modifies all spawners above:
 **`SpawnerAccessor`:** reflection-based access to `BaseSpawner` private fields. Resolves by name first, then probes by default value (16 / 20) as fallback. Cached in `static volatile` fields.
 
 **NBT:** persists `SpawnerCount` + `OriginalRange_N`, `OriginalMinDelay_N`, `OriginalMaxDelay_N` so originals survive chunk reload.
+
+**Acquisition:** no crafting recipe — found only in dungeon loot (Overworld structures).
 
 **Known limitation:** spawner placed after agitator is only detected on chunk reload (`onLoad`). `neighborChanged` in 1.21.11 takes `Orientation` (not `BlockPos`), not currently overridden.
 
@@ -115,7 +119,7 @@ Column block that repels hostile mobs outward. Radius scales with column height.
 | `randomTick` | `notifyColumn()` — integrity recheck |
 | `onLoad` (BE) | `recalcColumn()` |
 
-**Loot:** found in jungle temples, desert pyramids, strongholds, mineshafts, simple dungeons.
+**Acquisition:** no crafting recipe — found only in dungeon loot (jungle temples, desert pyramids, strongholds, mineshafts, simple dungeons).
 
 ---
 
@@ -135,6 +139,8 @@ Prevents entity teleportation within radius. Participates in mixed warding colum
 - `WardingColumnBlock` — marker interface for both types
 - `ColumnHelper` — `forEachInMixedColumn`, `countInMixedColumn`, `isTopOfMixedColumn`
 - `WardingPostTeleportHandler` — scans range, reads radius from top-of-column BE
+
+**Acquisition:** no crafting recipe — loot-only (same dungeon sources as Warding Post).
 
 ---
 
@@ -161,7 +167,7 @@ Column block that accelerates a block-entity machine. N clocks → N extra ticks
 
 **Ticker helper:** `EEClockBlock.getMachineTicker()` uses `@SuppressWarnings("unchecked")` cast `(BlockEntityType<T>) be.getType()`. Cast is safe — BE instance and its type always correspond.
 
-**Loot:** End City treasure chests (weight 5, empty weight 10).
+**Acquisition:** no crafting recipe — found only in End City treasure chests (weight 5, empty weight 10).
 
 **Texture:** `cube_bottom_top` model with `ee_clock_top`, `ee_clock_bottom`, `ee_clock_side`.
 

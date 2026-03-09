@@ -29,7 +29,7 @@ Permanently force-loads its chunk so machines keep running when no player is nea
 
 | | |
 |---|---|
-| **Recipe** | 8 iron blocks + 1 emerald block (shapeless) |
+| **Acquisition** | Dungeon loot (Overworld structures) — no crafting recipe |
 | **Tool** | Pickaxe |
 | **Notes** | One loader per chunk is sufficient; stacking has no extra effect |
 
@@ -43,7 +43,7 @@ Place below a column of vanilla mob spawners. Removes the player-proximity requi
 |---|---|
 | **Layout** | `[agitators...][spawners...]` — agitators at bottom, spawners on top |
 | **Effect** | Spawners always active; delays divided by agitator count |
-| **Recipe** | Iron bars surrounding a blaze rod |
+| **Acquisition** | Dungeon loot (Overworld structures) — no crafting recipe |
 | **Tool** | Pickaxe |
 
 > **Limitation:** A spawner placed *above* the agitator after the fact is only detected on chunk reload.
@@ -58,7 +58,7 @@ Column block that pushes hostile mobs outward. Stack posts to increase radius.
 |---|---|
 | **Radius** | 4 blocks per post in column (1 post → 4 blocks, 4 posts → 16 blocks) |
 | **Vertical range** | ±2 blocks from column |
-| **Recipe** | Found in dungeon loot (jungle temples, desert pyramids, strongholds, mineshafts) |
+| **Acquisition** | Dungeon loot (jungle temples, desert pyramids, strongholds, mineshafts) — no crafting recipe |
 | **Tool** | Pickaxe |
 
 ---
@@ -71,6 +71,7 @@ Prevents entity teleportation (Endermen, Chorus Fruit, Ender Pearls) within radi
 |---|---|
 | **Radius** | 4 blocks per (warding post + inhibitor) in mixed column |
 | **Exemptions** | Player `/tp` commands are not blocked |
+| **Acquisition** | Dungeon loot (same sources as Warding Post) — no crafting recipe |
 | **Tool** | Pickaxe |
 
 ---
@@ -83,7 +84,7 @@ Column block that accelerates the block-entity machine directly above (or below 
 |---|---|
 | **Effect** | N clocks → machine ticks N+1 times per game tick |
 | **Compatible** | Any vanilla or modded machine with a server-side ticker |
-| **Loot** | End City treasure chests |
+| **Acquisition** | End City treasure chests — no crafting recipe |
 | **Tool** | Pickaxe |
 
 ---
