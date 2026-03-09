@@ -20,7 +20,7 @@ No tests exist. `make test` runs `./gradlew test` but there are no test sources.
 
 ## Architecture
 
-**WNIR** (When Nothing Is Ready) is a NeoForge Minecraft mod for 1.21.11 that provides custom blocks, mob effects, enchantments, and a brewing potion. It is the companion mod to **Minaret** (WebSocket + chord keys, at `/Users/vany/l/minaret`).
+**WNIR** (When Nothing Is Ready) is a standalone NeoForge Minecraft mod for 1.21.11 that provides custom blocks, mob effects, enchantments, and a brewing potion.
 
 ### Build structure
 - Flat single-module Gradle project — no `versions/` subdirectory
@@ -39,6 +39,7 @@ No tests exist. `make test` runs `./gradlew test` but there are no test sources.
 - `AnvilUpdateEvent.setXpCost(int)` — direct (not `setCost`)
 - `RegisterBrewingRecipesEvent` on `NeoForge.EVENT_BUS` (not modEventBus)
 - `affectNeighborsAfterRemoval(BlockState, ServerLevel, BlockPos, boolean)` replaces `onRemove`
+- `ResourceKey.identifier()` — replaces `location()` (renamed in 1.21.11)
 
 ### Core classes (all in `com.wnir`)
 - **WnirMod** — Mod entry point (`@Mod`). Registers all event handlers and lifecycle listeners.

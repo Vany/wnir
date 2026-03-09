@@ -107,7 +107,7 @@ public class ChunkLoaderData {
 
     public static ChunkLoaderData get(ServerLevel level) {
         return instances.computeIfAbsent(level.dimension(), key -> {
-            var loc = key.location();
+            var loc = key.identifier();
             String dimId = loc.getNamespace() + "_" + loc.getPath().replace('/', '_');
             String fileName = "wnir_chunk_loaders_" + dimId + ".txt";
             Path worldDir = level.getServer().getWorldPath(LevelResource.ROOT);

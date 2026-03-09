@@ -76,7 +76,7 @@ public abstract class WardingColumnBlockEntity extends BlockEntity {
         }
     }
 
-    /** Called from MinaretMod.onServerStopping() to clear all registry entries. */
+    /** Called from WnirMod.onServerStopping() to clear all registry entries. */
     public static void clearRegistry() {
         inhibitorRegistry.clear();
     }

@@ -7,6 +7,6 @@ import net.minecraft.world.level.block.state.BlockState;
 public class RepellingPostBlockEntity extends WardingColumnBlockEntity {
 
     public RepellingPostBlockEntity(BlockPos pos, BlockState state) {
-        super(MinaretRegistries.REPELLING_POST_BE.get(), pos, state);
+        super(WnirRegistries.REPELLING_POST_BE.get(), pos, state);
     }
 }

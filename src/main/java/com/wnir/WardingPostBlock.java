@@ -20,7 +20,7 @@ public class WardingPostBlock extends WardingColumnBaseBlock {
 
     @Override
     protected Supplier<BlockEntityType<? extends WardingColumnBlockEntity>> beTypeSupplier() {
-        return MinaretRegistries.WARDING_POST_BE::get;
+        return WnirRegistries.WARDING_POST_BE::get;
     }
 
     @Override

@@ -7,6 +7,6 @@ import net.minecraft.world.level.block.state.BlockState;
 public class TeleporterInhibitorBlockEntity extends WardingColumnBlockEntity {
 
     public TeleporterInhibitorBlockEntity(BlockPos pos, BlockState state) {
-        super(MinaretRegistries.TELEPORTER_INHIBITOR_BE.get(), pos, state);
+        super(WnirRegistries.TELEPORTER_INHIBITOR_BE.get(), pos, state);
     }
 }

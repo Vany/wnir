@@ -28,7 +28,7 @@ public class EEClockBlockEntity extends BlockEntity {
     int columnHeight = 1;
 
     public EEClockBlockEntity(BlockPos pos, BlockState state) {
-        super(MinaretRegistries.EE_CLOCK_BE.get(), pos, state);
+        super(WnirRegistries.EE_CLOCK_BE.get(), pos, state);
     }
 
     // ── Tick ─────────────────────────────────────────────────────────────

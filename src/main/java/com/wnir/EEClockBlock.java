@@ -41,7 +41,7 @@ public class EEClockBlock extends BaseEntityBlock {
         Level level, BlockState state, BlockEntityType<T> type
     ) {
         if (level.isClientSide()) return null;
-        return createTickerHelper(type, MinaretRegistries.EE_CLOCK_BE.get(), EEClockBlockEntity::serverTick);
+        return createTickerHelper(type, WnirRegistries.EE_CLOCK_BE.get(), EEClockBlockEntity::serverTick);
     }
 
     /** Periodic integrity recheck in case blocks were placed/removed without a block update. */

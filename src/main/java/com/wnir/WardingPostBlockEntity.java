@@ -7,6 +7,6 @@ import net.minecraft.world.level.block.state.BlockState;
 public class WardingPostBlockEntity extends WardingColumnBlockEntity {
 
     public WardingPostBlockEntity(BlockPos pos, BlockState state) {
-        super(MinaretRegistries.WARDING_POST_BE.get(), pos, state);
+        super(WnirRegistries.WARDING_POST_BE.get(), pos, state);
     }
 }

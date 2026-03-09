@@ -29,7 +29,7 @@
 
 ## Overview
 
-**WNIR** is a NeoForge mod (1.21.11 only) that adds gameplay content: custom blocks, mob effects, enchantments, and a potion. It is the companion mod to **Minaret** (WebSocket + chord keys).
+**WNIR** is a standalone NeoForge mod (1.21.11 only) that adds gameplay content: custom blocks, mob effects, enchantments, and a potion.
 
 ## Platform
 
@@ -245,7 +245,7 @@ Multiplies next incoming hit by 8×, then removes itself.
 
 ### Streamer Protect (`wnir:streamer_protect`) — `#FFD700`
 
-Indicator-only. No handler — logic handled externally (e.g. via Minaret WebSocket API).
+Indicator-only. No handler — reserved for external use.
 
 ---
 
@@ -336,6 +336,7 @@ Contains: chunk_loader, spawner_agitator, warding_post, teleporter_inhibitor, re
 1. **No Compat class** — 1.21.11 only; use direct APIs throughout. No reflection for cross-version compat.
 2. **`new BlockEntityType<>(factory, Set.of(block))`** — direct constructor (no Builder), 1.21.11 API.
 3. **`Identifier.fromNamespaceAndPath`** — for ResourceKey creation; `Identifier` is the 1.21.11 rename of `ResourceLocation`.
+3b. **`ResourceKey.identifier()`** — replaces `location()` (renamed in 1.21.11); used to extract the `Identifier` from a `ResourceKey`.
 4. **`tag.getInt(key).orElse(0)`** — `CompoundTag.getInt` returns `Optional<Integer>` in 1.21.11.
 5. **`attr.removeModifier(Identifier)`** — direct call; Compat reflection not needed in 1.21.11.
 6. **`new AttributeModifier(Identifier, amount, op)`** — direct constructor; no reflection.

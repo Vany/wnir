@@ -7,6 +7,6 @@ import net.minecraft.world.level.block.state.BlockState;
 public class ChunkLoaderBlockEntity extends BlockEntity {
 
     public ChunkLoaderBlockEntity(BlockPos pos, BlockState state) {
-        super(MinaretRegistries.CHUNK_LOADER_BE.get(), pos, state);
+        super(WnirRegistries.CHUNK_LOADER_BE.get(), pos, state);
     }
 }

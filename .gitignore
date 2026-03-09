@@ -9,7 +9,11 @@ out/
 *.iws
 *.ipr
 .vscode/
+.eclipse/
 *.class
+
+# Build output
+bin/
 
 # NeoForge / Minecraft dev
 run/

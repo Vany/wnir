@@ -16,9 +16,9 @@ public final class DeadBlowHandler {
 
     public static void onLivingIncomingDamage(LivingIncomingDamageEvent event) {
         if (!(event.getSource().getEntity() instanceof Player player)) return;
-        if (!player.hasEffect(MinaretRegistries.DEAD_BLOW)) return;
+        if (!player.hasEffect(WnirRegistries.DEAD_BLOW)) return;
 
         event.setAmount(event.getAmount() * DAMAGE_MULTIPLIER);
-        player.removeEffect(MinaretRegistries.DEAD_BLOW);
+        player.removeEffect(WnirRegistries.DEAD_BLOW);
     }
 }

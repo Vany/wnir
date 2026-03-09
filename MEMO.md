@@ -1,7 +1,7 @@
 # MEMO.md — When Nothing Is Ready (wnir)
 
 ## Project
-NeoForge mod, 1.21.11 only, no Compat. Companion to minaret (WebSocket + chord keys).
+Standalone NeoForge mod, 1.21.11 only, no Compat.
 Repo: `/Users/vany/l/wnir`
 Test instance: `/Users/vany/Library/Application Support/PrismLauncher/instances/VanyLLa3d/minecraft/mods/`
 Deploy: `make build`, then copy jar from `build/libs/` to test instance.
@@ -20,6 +20,7 @@ Deploy: `make build`, then copy jar from `build/libs/` to test instance.
 |------|-----|
 | BlockEntityType | `new BlockEntityType<>(factory, Set.of(block))` |
 | Block registry ID | `props.setId(ResourceKey.create(Registries.BLOCK, Identifier.fromNamespaceAndPath(MOD_ID, name)))` |
+| ResourceKey → Identifier | `key.identifier()` (NOT `key.location()` — renamed in 1.21.11) |
 | CompoundTag.getInt | Returns `Optional<Integer>` — always `.orElse(0)` |
 | AttributeModifier | `new AttributeModifier(Identifier, amount, operation)` |
 | Remove attribute modifier | `attr.removeModifier(Identifier)` — direct, no reflection |
