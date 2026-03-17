@@ -3,6 +3,7 @@
   "values": [
     "wnir:swift_strike",
     "wnir:accelerate",
-    "wnir:toughness"
+    "wnir:toughness",
+    "wnir:over_crooking"
   ]
 }

@@ -1,0 +1,18 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "pattern": [
+    "CPC",
+    "PNP",
+    "CPC"
+  ],
+  "key": {
+    "C": "minecraft:crying_obsidian",
+    "P": "minecraft:ender_pearl",
+    "N": "minecraft:nether_star"
+  },
+  "result": {
+    "id": "wnir:personal_dimension_teleporter",
+    "count": 1
+  },
+  "category": "misc"
+}

@@ -21,6 +21,7 @@
 - [x] Toughness enchantment
 - [x] Mega Chanter potion (Awkward + Book)
 - [x] Mossy Hopper block
+- [x] Personal Dimension Teleporter block + wnir:personal dimension
 - [~] Enchanted weapons in dungeon loot — REMOVED (loot modifier conditions broken in 1.21.11; enchants available at enchanting table only)
 - [~] Enchantment books in dungeon loot — REMOVED (same reason)
 - [x] EE Clock in End City loot

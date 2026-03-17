@@ -57,7 +57,11 @@ public class EEClockBlock extends BaseEntityBlock {
         BlockState state, Level level, BlockPos pos, BlockState oldState, boolean movedByPiston
     ) {
         super.onPlace(state, level, pos, oldState, movedByPiston);
-        if (!level.isClientSide()) notifyColumn(level, pos);
+        if (!level.isClientSide()) {
+            notifyColumn(level, pos);
+            EEClockBuddingCrystalBlock.tryTransformAbove(level, pos);
+            TeleporterCrystalBlock.tryTransformAbove(level, pos);
+        }
     }
 
     @Override

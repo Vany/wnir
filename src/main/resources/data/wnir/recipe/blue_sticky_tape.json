@@ -1,0 +1,11 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "pattern": ["BBB", "PPP", "SSS"],
+  "key": {
+    "B": "minecraft:blue_dye",
+    "P": "minecraft:paper",
+    "S": "minecraft:slime_ball"
+  },
+  "result": {"id": "wnir:blue_sticky_tape", "count": 1},
+  "category": "misc"
+}

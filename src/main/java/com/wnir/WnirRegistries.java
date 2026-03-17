@@ -24,6 +24,7 @@ import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.block.entity.BlockEntityType;
 import net.minecraft.world.level.block.state.BlockBehaviour;
 import net.minecraft.world.level.material.MapColor;
+import net.minecraft.world.level.biome.BiomeSource;
 import net.neoforged.bus.api.IEventBus;
 import net.neoforged.neoforge.registries.DeferredHolder;
 import net.neoforged.neoforge.registries.DeferredRegister;
@@ -60,6 +61,11 @@ public final class WnirRegistries {
             new Potion("mega_chanter", new MobEffectInstance(MEGA_CHANTER, 3600, 0))
         );
 
+    public static final DeferredHolder<Potion, Potion> MARTIAL_LIGHTNING_POTION =
+        POTIONS.register("martial_lightning", () ->
+            new Potion("martial_lightning", new MobEffectInstance(MARTIAL_LIGHTNING, 3600, 0))
+        );
+
     // ── Block registration ───────────────────────────────────────────────
 
     private static final DeferredRegister<Block> BLOCKS =
@@ -76,6 +82,18 @@ public final class WnirRegistries {
 
     private static final DeferredRegister<CreativeModeTab> CREATIVE_TABS =
         DeferredRegister.create(BuiltInRegistries.CREATIVE_MODE_TAB, WnirMod.MOD_ID);
+
+    @SuppressWarnings({"unchecked", "rawtypes"})
+    private static final DeferredRegister<com.mojang.serialization.MapCodec<? extends BiomeSource>> BIOME_SOURCES =
+        DeferredRegister.create(
+            (net.minecraft.core.Registry<com.mojang.serialization.MapCodec<? extends BiomeSource>>)
+            (net.minecraft.core.Registry<?>) BuiltInRegistries.BIOME_SOURCE,
+            WnirMod.MOD_ID
+        );
+
+    @SuppressWarnings("unused")
+    private static final java.util.function.Supplier<com.mojang.serialization.MapCodec<PersonalBiomeSource>>
+        PERSONAL_BIOME_SOURCE = BIOME_SOURCES.register("personal", () -> PersonalBiomeSource.CODEC);
 
     @SuppressWarnings("unchecked")
     private static final DeferredRegister<MenuType<?>> MENU_TYPES =
@@ -163,6 +181,14 @@ public final class WnirRegistries {
         registerBlock("ee_clock", EEClockBlock::new, EEClockBlockEntity::new,
             BlockBehaviour.Properties.of().mapColor(MapColor.COLOR_CYAN).sound(SoundType.METAL).randomTicks());
 
+    private static final BlockBundle<EEClockBuddingCrystalBlock, EEClockBuddingCrystalBlockEntity> EE_CLOCK_BUDDING_CRYSTAL =
+        registerBlock("ee_clock_budding_crystal", EEClockBuddingCrystalBlock::new, EEClockBuddingCrystalBlockEntity::new,
+            BlockBehaviour.Properties.of()
+                .mapColor(MapColor.COLOR_LIGHT_GREEN)
+                .sound(SoundType.AMETHYST)
+                .strength(1.5f)
+                .requiresCorrectToolForDrops());
+
     private static final BlockBundle<MossyHopperBlock, MossyHopperBlockEntity> MOSSY_HOPPER =
         registerBlock("mossy_hopper", MossyHopperBlock::new, MossyHopperBlockEntity::new,
             BlockBehaviour.Properties.of()
@@ -180,10 +206,43 @@ public final class WnirRegistries {
                 .requiresCorrectToolForDrops()
                 .strength(50f, 3_600_000f));
 
+    private static final SimpleBlockBundle<PersonalDimensionTeleporterBlock> PERSONAL_DIMENSION_TELEPORTER =
+        registerSimpleBlock("personal_dimension_teleporter", PersonalDimensionTeleporterBlock::new,
+            BlockBehaviour.Properties.of()
+                .mapColor(MapColor.COLOR_PURPLE)
+                .sound(SoundType.AMETHYST)
+                .requiresCorrectToolForDrops()
+                .strength(50f, 1_200_000f));
+
+    private static final BlockBundle<TeleporterCrystalBlock, TeleporterCrystalBlockEntity> TELEPORTER_CRYSTAL =
+        registerBlock("teleporter_crystal", TeleporterCrystalBlock::new, TeleporterCrystalBlockEntity::new,
+            BlockBehaviour.Properties.of()
+                .mapColor(MapColor.COLOR_PURPLE)
+                .sound(SoundType.AMETHYST)
+                .strength(1.5f)
+                .requiresCorrectToolForDrops());
+
+    // ── Standalone items ─────────────────────────────────────────────────
+
+    public static final Supplier<BlueStickyTapeItem> BLUE_STICKY_TAPE_ITEM =
+        ITEMS.register("blue_sticky_tape", () ->
+            new BlueStickyTapeItem(
+                new Item.Properties()
+                    .stacksTo(1)
+                    .setId(ResourceKey.create(Registries.ITEM, id("blue_sticky_tape")))
+            )
+        );
+
     // ── Public accessors ─────────────────────────────────────────────────
 
     public static final Supplier<MenuType<MossyHopperMenu>> MOSSY_HOPPER_MENU =
         MENU_TYPES.register("mossy_hopper", () -> new MenuType<>(MossyHopperMenu::new, FeatureFlags.VANILLA_SET));
+
+    public static final Supplier<MenuType<EEClockBuddingCrystalMenu>> EE_CLOCK_BUDDING_CRYSTAL_MENU =
+        MENU_TYPES.register("ee_clock_budding_crystal", () -> new MenuType<>(EEClockBuddingCrystalMenu::new, FeatureFlags.VANILLA_SET));
+
+    public static final Supplier<MenuType<TeleporterCrystalMenu>> TELEPORTER_CRYSTAL_MENU =
+        MENU_TYPES.register("teleporter_crystal", () -> new MenuType<>(TeleporterCrystalMenu::new, FeatureFlags.VANILLA_SET));
 
     public static final Supplier<BlockEntityType<MossyHopperBlockEntity>> MOSSY_HOPPER_BE = MOSSY_HOPPER.entity;
     public static final Supplier<BlockItem> MOSSY_HOPPER_ITEM = MOSSY_HOPPER.item;
@@ -191,6 +250,12 @@ public final class WnirRegistries {
     public static final Supplier<BlockEntityType<SpawnerAgitatorBlockEntity>> SPAWNER_AGITATOR_BE = SPAWNER_AGITATOR.entity;
     public static final Supplier<BlockEntityType<WardingColumnBlockEntity>> WARDING_COLUMN_BLOCK_ENTITY = WARDING_COLUMN_BE;
     public static final Supplier<BlockEntityType<EEClockBlockEntity>> EE_CLOCK_BE = EE_CLOCK.entity;
+    public static final Supplier<EEClockBlock> EE_CLOCK_BLOCK = EE_CLOCK.block;
+    public static final Supplier<BlockEntityType<EEClockBuddingCrystalBlockEntity>> EE_CLOCK_BUDDING_CRYSTAL_BE = EE_CLOCK_BUDDING_CRYSTAL.entity;
+    public static final Supplier<EEClockBuddingCrystalBlock> EE_CLOCK_BUDDING_CRYSTAL_BLOCK = EE_CLOCK_BUDDING_CRYSTAL.block;
+    public static final Supplier<BlockEntityType<TeleporterCrystalBlockEntity>> TELEPORTER_CRYSTAL_BE = TELEPORTER_CRYSTAL.entity;
+    public static final Supplier<TeleporterCrystalBlock> TELEPORTER_CRYSTAL_BLOCK = TELEPORTER_CRYSTAL.block;
+    public static final Supplier<PersonalDimensionTeleporterBlock> PERSONAL_DIMENSION_TELEPORTER_BLOCK = PERSONAL_DIMENSION_TELEPORTER.block;
 
     public static final Supplier<BlockItem> CHUNK_LOADER_ITEM = CHUNK_LOADER.item;
     public static final Supplier<BlockItem> SPAWNER_AGITATOR_ITEM = SPAWNER_AGITATOR.item;
@@ -199,6 +264,9 @@ public final class WnirRegistries {
     public static final Supplier<BlockItem> REPELLING_POST_ITEM = REPELLING_POST.item;
     public static final Supplier<BlockItem> ANTI_WITHER_ITEM = ANTI_WITHER.item;
     public static final Supplier<BlockItem> EE_CLOCK_ITEM = EE_CLOCK.item;
+    public static final Supplier<BlockItem> EE_CLOCK_BUDDING_CRYSTAL_ITEM = EE_CLOCK_BUDDING_CRYSTAL.item;
+    public static final Supplier<BlockItem> PERSONAL_DIMENSION_TELEPORTER_ITEM = PERSONAL_DIMENSION_TELEPORTER.item;
+    public static final Supplier<BlockItem> TELEPORTER_CRYSTAL_ITEM = TELEPORTER_CRYSTAL.item;
 
     // ── Creative tab ─────────────────────────────────────────────────────
 
@@ -216,7 +284,11 @@ public final class WnirRegistries {
                     output.accept(REPELLING_POST_ITEM.get());
                     output.accept(ANTI_WITHER_ITEM.get());
                     output.accept(EE_CLOCK_ITEM.get());
+                    output.accept(EE_CLOCK_BUDDING_CRYSTAL_ITEM.get());
+                    output.accept(TELEPORTER_CRYSTAL_ITEM.get());
                     output.accept(MOSSY_HOPPER_ITEM.get());
+                    output.accept(PERSONAL_DIMENSION_TELEPORTER_ITEM.get());
+                    output.accept(BLUE_STICKY_TAPE_ITEM.get());
                 })
                 .build()
         );
@@ -231,5 +303,6 @@ public final class WnirRegistries {
         BLOCK_ENTITIES.register(modEventBus);
         MENU_TYPES.register(modEventBus);
         CREATIVE_TABS.register(modEventBus);
+        BIOME_SOURCES.register(modEventBus);
     }
 }
