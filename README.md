@@ -1,11 +1,11 @@
-[![NeoForge](https://img.shields.io/badge/NeoForge-21.1.172+-orange.svg)](https://neoforged.net/)
-[![Minecraft](https://img.shields.io/badge/Minecraft-1.21.1%20%7C%201.21.11-green.svg)](https://minecraft.net/)
+[![NeoForge](https://img.shields.io/badge/NeoForge-21.11.38--beta-orange.svg)](https://neoforged.net/)
+[![Minecraft](https://img.shields.io/badge/Minecraft-1.21.11-green.svg)](https://minecraft.net/)
 [![Java](https://img.shields.io/badge/Java-21+-blue.svg)](https://openjdk.org/)
 [![License](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
 # WNIR — When Nothing Is Ready
 
-A standalone NeoForge mod for Minecraft 1.21.11 that fills gaps in vanilla gameplay with custom blocks, mob effects, enchantments, and a potion.
+A standalone NeoForge mod for Minecraft 1.21.11 that fills gaps in vanilla gameplay with custom blocks, mob effects, enchantments, and potions.
 
 **Mod ID:** `wnir` | **Loader:** NeoForge 21.11.38-beta | **Java:** 21+
 
@@ -14,9 +14,25 @@ A standalone NeoForge mod for Minecraft 1.21.11 that fills gaps in vanilla gamep
 ## Contents
 
 - [Blocks](#blocks)
+  - [Chunk Loader](#chunk-loader)
+  - [Spawner Agitator](#spawner-agitator)
+  - [Warding Post](#warding-post)
+  - [Teleporter Inhibitor](#teleporter-inhibitor)
+  - [EE Clock](#ee-clock)
+  - [EE Clock Budding Crystal](#ee-clock-budding-crystal)
+  - [Teleporter Crystal](#teleporter-crystal)
+  - [Personal Dimension Teleporter](#personal-dimension-teleporter)
+  - [Mossy Hopper](#mossy-hopper)
+  - [Anti-Wither Block](#anti-wither-block)
+- [Items](#items)
+  - [Blue Sticky Tape](#blue-sticky-tape)
 - [Mob Effects](#mob-effects)
 - [Enchantments](#enchantments)
-- [Potion](#potion)
+  - [Swift Strike](#swift-strike)
+  - [Accelerate](#accelerate)
+  - [Toughness](#toughness)
+  - [OverCrooking](#overcrooking)
+- [Potions](#potions)
 - [Building](#building)
 
 ---
@@ -41,12 +57,12 @@ Place below a column of vanilla mob spawners. Removes the player-proximity requi
 
 | | |
 |---|---|
-| **Layout** | `[agitators...][spawners...]` — agitators at bottom, spawners on top |
+| **Layout** | `[agitators...][spawners...]` — agitators at bottom, spawners stacked on top |
 | **Effect** | Spawners always active; delays divided by agitator count |
 | **Acquisition** | Dungeon loot (Overworld structures) — no crafting recipe |
 | **Tool** | Pickaxe |
 
-> **Limitation:** A spawner placed *above* the agitator after the fact is only detected on chunk reload.
+> **Limitation:** A spawner placed above the agitator after the fact is only detected on chunk reload.
 
 ---
 
@@ -61,11 +77,13 @@ Column block that pushes hostile mobs outward. Stack posts to increase radius.
 | **Acquisition** | Dungeon loot (jungle temples, desert pyramids, strongholds, mineshafts) — no crafting recipe |
 | **Tool** | Pickaxe |
 
+Can be mixed with Teleporter Inhibitor blocks in a single column — the combined column height counts toward both effects.
+
 ---
 
 ### Teleporter Inhibitor
 
-Prevents entity teleportation (Endermen, Chorus Fruit, Ender Pearls) within radius. Can be mixed with Warding Posts in a single column.
+Prevents entity teleportation (Endermen blink, Chorus Fruit, Ender Pearls) within radius. Stacks with Warding Posts in a mixed column.
 
 | | |
 |---|---|
@@ -87,53 +105,139 @@ Column block that accelerates the block-entity machine directly above (or below 
 | **Acquisition** | End City treasure chests — no crafting recipe |
 | **Tool** | Pickaxe |
 
+**Interaction with crystals:** placing a Budding Amethyst or Crying Obsidian directly on top of an EE Clock column transforms them into the corresponding crystal growth block (see below).
+
+---
+
+### EE Clock Budding Crystal
+
+A growth block that slowly converts into a new EE Clock. Created automatically when a Budding Amethyst block is placed on top of an EE Clock column, or when an EE Clock is placed beneath an existing Budding Amethyst.
+
+| | |
+|---|---|
+| **Growth time** | 168 000 ticks (1 Minecraft week) ÷ EE Clock column height below |
+| **Transforms into** | EE Clock |
+| **GUI** | Right-click to monitor progress |
+| **Acquisition** | Budding Amethyst + EE Clock column interaction; crafting recipe |
+| **Tool** | Pickaxe |
+
+This block is **not** accelerated by the EE Clock it sits on top of — that would be recursive.
+
+---
+
+### Teleporter Crystal
+
+A growth block that slowly converts into a Personal Dimension Teleporter. Created automatically when Crying Obsidian is placed on top of an EE Clock column, or when an EE Clock is placed beneath existing Crying Obsidian.
+
+| | |
+|---|---|
+| **Growth time** | 168 000 ticks (1 Minecraft week) ÷ EE Clock column height below |
+| **Fuel required** | 16 ender pearls (feed 14 via GUI; 2 consumed at final transformation) |
+| **Transforms into** | Personal Dimension Teleporter |
+| **GUI** | Right-click to insert ender pearls and monitor progress |
+| **Acquisition** | Crying Obsidian + EE Clock column interaction; crafting recipe |
+| **Tool** | Pickaxe |
+
+The crystal will not transform until it is both fully grown and fully fuelled.
+
+---
+
+### Personal Dimension Teleporter
+
+Teleports a player to the shared `wnir:personal` dimension, into their own private region. Each player gets a separate area along the X-axis.
+
+**Head mechanic** — place a skull directly above the teleporter to control access:
+
+| Skull type | Who can use |
+|------------|-------------|
+| No skull | Nobody |
+| Player skull | Skull owner only |
+| Mob skull (skeleton, creeper, etc.) | Any player |
+
+**Hunger cost:** player must have a full hunger bar (20 food points).
+- Attempting to teleport with less than 20 food deals 1 HP damage and is denied.
+- Successful teleport drains hunger and saturation to 0.
+
+| | |
+|---|---|
+| **Dimension** | `wnir:personal` — single shared dimension with per-player X-axis regions |
+| **Spawn point** | Surface at center of player's region; determined by player UUID |
+| **Acquisition** | Grown from a Teleporter Crystal |
+| **Tool** | Pickaxe |
+
 ---
 
 ### Mossy Hopper
 
-A 10-slot hopper designed for item sorting. It **never ejects the last item** in a stack, keeping one copy of each item type in-place to act as a filter.
+A 10-slot hopper designed for item sorting. It **never ejects the last item** in a slot, keeping one copy in-place as a permanent filter.
 
 | | |
 |---|---|
 | **Slots** | 10 (two rows of 5) |
 | **Transfer rate** | 2 items per 8 ticks from randomly chosen eligible slots |
-| **Eligible slot** | Any slot with count > 1 |
-| **Recipe** | Hopper surrounded by 5 mossy cobblestone: `"M M" / "MHM" / " M "` |
+| **Eligible slot** | Any slot where count > 1 |
+| **Recipe** | Hopper + 5 mossy cobblestone: `"M M" / "MHM" / " M "` |
 | **Tool** | Pickaxe |
 
-Right-click to open the GUI. Connect to other containers and hoppers normally — it pulls from above and pushes toward its facing direction.
+Right-click to open the GUI. Pulls from above and pushes in its facing direction, like a vanilla hopper.
 
 ---
 
 ### Anti-Wither Block
 
-Explosion-immune decorative block. Withstands Wither skulls, bed explosions in the Nether, and anything else.
+Explosion-immune decorative block. Withstands Wither skulls, Creeper and TNT explosions, bed explosions in the Nether — anything.
 
 | | |
 |---|---|
 | **Blast resistance** | 3,600,000 |
-| **Recipe** | 8 obsidian + 1 nether star (shaped: `"IOI"/"IOI"/"IOI"` with O=obsidian, I=iron_bars) |
+| **Recipe** | Shaped: 8× obsidian + 1× nether star in centre (`"OOO" / "ONO" / "OOO"`) |
 | **Tool** | Diamond pickaxe or better |
+
+---
+
+## Items
+
+### Blue Sticky Tape
+
+Picks up any block (except bedrock and air) along with its full NBT data, then places it back on right-click — consuming the tape.
+
+**Picking up:**
+- Stores the block's state and block entity data (inventory contents, spawner config, etc.)
+- Containers have their items cleared before removal to prevent duplication
+- The tape switches to a special visual showing the block's face texture with a blue X cross
+
+**Placing:**
+- Restores the block and reloads all stored NBT into the new block entity
+- Places the block on the face you click
+
+**Information:**
+- Item name changes to **"Wrapped \<block name\>"** while holding a block
+- Tooltip shows container contents (up to 8 items) with counts
+- Tooltip shows spawner entity type when wrapping a mob spawner
+
+**Crafting recipe:** see `data/wnir/recipe/blue_sticky_tape.json`
 
 ---
 
 ## Mob Effects
 
-All effects are beneficial. Obtain them via potions, commands, or mods that grant effects.
+All effects are beneficial. Obtain via potions, commands, or any mod that grants effects.
 
 ### Martial Lightning `#00BFFF`
 
-Dramatically boosts melee damage based on the held weapon tier. Weaker weapons hit harder but apply debuffs to the attacker.
+Boosts melee damage based on the held weapon tier. Weaker weapons hit harder but apply debuffs to the attacker.
 
 | Weapon | Damage multiplier | AoE | Side effect on target |
-|--------|------------------|-----|-----------------------|
+|--------|-----------------|-----|-----------------------|
 | Bare hand | ×10 | Yes | — |
 | Wooden | ×5 | Yes | Poison (31, 10s) |
 | Stone | ×3 | Yes | Wither (3, 10s) |
 | Iron | ×1.5 | No | — |
-| Other | ×1 | No | — |
+| Other (gold, diamond, netherite) | ×1 | No | — |
 
 AoE hits all entities in the forward hemisphere within interaction range.
+
+Obtainable as a potion: Potion / Splash Potion / Lingering Potion / Arrow of Martial Lightning.
 
 ---
 
@@ -141,8 +245,8 @@ AoE hits all entities in the forward hemisphere within interaction range.
 
 Replaces fired arrows with homing shulker bullets that track the nearest enemy.
 
-- **Target:** entity under crosshair up to 100 blocks, or nearest entity within 50 blocks
-- **Damage:** up to 18 at full draw (scales with bow pull and velocity)
+- **Target priority:** entity under crosshair within 100 blocks, then nearest entity within 50 blocks
+- **Damage:** up to 18 at full draw (scales with bow pull and arrow velocity)
 
 ---
 
@@ -152,33 +256,33 @@ You glow. Mobs can always find you. They suffer for it.
 
 - Permanent Glowing + Night Vision on the player
 - All mobs within 48 blocks get 2× Follow Range
-- When a mob locks onto you: 25% chance Blindness (5s), 25% chance Weakness (5s)
+- When a mob locks onto you: 25% chance Blindness (5s), 25% chance Weakness (5s), applied to the mob
 
 ---
 
 ### Mega Chanter `#00FF99`
 
-Removes the "Too Expensive!" anvil cap. All repair and enchanting operations go through regardless of accumulated cost.
+Removes the "Too Expensive!" anvil cap. All repair and enchanting operations go through regardless of accumulated cost. Cost display is capped at 39 XP.
 
-Can also be brewed as a potion — see [Potion](#potion).
+Can also be brewed as a potion — see [Potions](#potions).
 
 ---
 
 ### Dead Blow `#FF2200`
 
-Your next hit deals 8× damage, then the effect is consumed.
+Your next hit deals 8× damage, then the effect is consumed. One shot.
 
 ---
 
 ### Streamer Protect `#FFD700`
 
-Indicator effect. Reserved for integration with external tools or manual creative use. No gameplay effect by itself.
+Indicator effect. No gameplay behaviour. Reserved for integration with external tools or manual creative use.
 
 ---
 
 ## Enchantments
 
-All three enchantments are available at the enchanting table on applicable item types.
+All enchantments are available at the enchanting table on applicable item types.
 
 ### Swift Strike
 
@@ -210,21 +314,43 @@ Increases arrow velocity, resulting in a flatter arc and more damage at range.
 
 ### Toughness
 
-Adds armor toughness. Stacks across all armor pieces.
+Adds armor toughness. Stacks across all equipped armor pieces.
 
-Each piece of Toughness N armor contributes +N toughness. Four pieces at level III = +12 total.
+Each piece of Toughness N armor contributes +N toughness. Four pieces at level III = +12 total toughness.
 
 **Applicable to:** all armor (`#minecraft:enchantable/armor`)
 
 ---
 
-## Potion
+### OverCrooking
+
+Multiplies the number of drops when breaking **leaves** with a hoe. Saplings and sticks are excluded from the bonus.
+
+| Level | Drop multiplier |
+|-------|----------------|
+| I | ×2 |
+| II | ×3 |
+| III | ×4 |
+
+**Applicable to:** hoes
+
+Useful for farming apples, berries-from-leaves mods, and anything else leaves drop.
+
+---
+
+## Potions
 
 ### Potion of Mega Chanting
 
 Grants **Mega Chanter** for 3 minutes. Brew splash and lingering variants via the standard vanilla brewing chain.
 
 **Recipe:** Awkward Potion + Book → Potion of Mega Chanting
+
+### Potion of Martial Lightning
+
+Grants **Martial Lightning**. Available as Potion, Splash Potion, Lingering Potion, and Arrow.
+
+**Recipe:** (via custom brewing ingredient — see mod source)
 
 ---
 
@@ -247,5 +373,6 @@ Output: `build/libs/wnir-1.21.11-1.0.0.jar`
 ## Compatibility
 
 - No external mod dependencies
-- No client-side-only components (server-safe)
+- No client-side-only components (fully server-safe)
 - No config file — all values are fixed by design
+- 1.21.11 only — no cross-version compatibility shims
