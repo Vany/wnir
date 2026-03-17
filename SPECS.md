@@ -22,6 +22,10 @@
 - [x] Mega Chanter potion (Awkward + Book)
 - [x] Mossy Hopper block
 - [x] Personal Dimension Teleporter block + wnir:personal dimension
+- [x] EE Clock Budding Crystal block (budding amethyst + EE Clock column → grows → becomes EE Clock)
+- [x] Teleporter Crystal block (crying obsidian + EE Clock column → grows → becomes Personal Dimension Teleporter)
+- [x] Blue Sticky Tape item (picks up any block with full NBT; renders wrapped block face + blue cross)
+- [x] OverCrooking enchantment (hoe enchant; multiplies leaf drops except saplings/sticks)
 - [~] Enchanted weapons in dungeon loot — REMOVED (loot modifier conditions broken in 1.21.11; enchants available at enchanting table only)
 - [~] Enchantment books in dungeon loot — REMOVED (same reason)
 - [x] EE Clock in End City loot
@@ -200,6 +204,54 @@ Item sorter hopper. Extends `HopperBlock` / `RandomizableContainerBlockEntity`.
 
 ---
 
+### EE Clock Budding Crystal (`wnir:ee_clock_budding_crystal`)
+
+Created automatically when a `BuddingAmethystBlock` is placed on top of an EE Clock column, or when an EE Clock is placed below an existing budding amethyst.
+
+**Growth:** `BASE_TICKS = 168000` (1 Minecraft week). Scales by column height below: N EE Clocks → 168 000 / N ticks. Does NOT accelerate via EE Clock's extra-tick mechanism (guarded in `EEClockBlockEntity`).
+
+**Transformation:** when progress reaches `BASE_TICKS`, the block replaces itself with an `EEClockBlock`.
+
+**GUI:** right-click opens `EEClockBuddingCrystalScreen` to show growth progress.
+
+**Acquisition:** crafted or obtained via EE Clock + budding amethyst interaction.
+
+---
+
+### Teleporter Crystal (`wnir:teleporter_crystal`)
+
+Created automatically when crying obsidian is placed on top of an EE Clock column, or when an EE Clock is placed below existing crying obsidian.
+
+**Growth:** same `BASE_TICKS = 168000` schedule as EE Clock Budding Crystal, scaled by column height.
+
+**Fuel:** consumes 16 ender pearls total — 14 fed in via GUI during growth, 2 consumed at transformation.
+
+**Transformation:** when fully grown and fuelled, replaces itself with a `PersonalDimensionTeleporterBlock`.
+
+**GUI:** right-click opens `TeleporterCrystalScreen` to insert ender pearls and monitor progress.
+
+---
+
+### Blue Sticky Tape (`wnir:blue_sticky_tape`)
+
+Item that picks up any block (except bedrock/air) with full NBT, then places it back on right-click, consuming the item.
+
+**Pickup:** clears container contents before world removal to prevent item duplication. Stores `block_state` + optional `block_entity` in `DataComponents.CUSTOM_DATA`. Sets `CUSTOM_MODEL_DATA=1` to trigger `SpecialModelRenderer`.
+
+**Placement:** restores block state + loads block entity NBT via `be.loadWithComponents(TagValueInput)`.
+
+**Item name (filled):** "Wrapped \<block name\>" via `getName()` override.
+
+**Tooltip (filled):** container contents (up to 8 items) from `"Items"` list; spawner entity type from `"SpawnData" → "entity" → "id"`.
+
+**Rendering:** `BlueStickyTapeRenderer` (`SpecialModelRenderer`). Sprite priority: SOUTH face → UP face → first unculled quad → `particleIcon()`. Overlays a generated blue X cross (`DynamicTexture`, 16×16).
+
+**Model:** `items/blue_sticky_tape.json` — `range_dispatch` on `custom_model_data`; threshold 1.0 activates `minecraft:special` renderer `wnir:blue_sticky_tape`.
+
+**Acquisition:** crafted (recipe: `data/wnir/recipe/blue_sticky_tape.json`).
+
+---
+
 ### Antiwither (`wnir:antiwither`)
 
 Explosion-immune block. Strength 50 (hardness) / 3,600,000 (explosion resistance) — immune to all explosions including the Wither. Requires diamond+ tool to mine.
@@ -332,6 +384,20 @@ Checks both main hand and off hand (crossbow can be in off hand). Works with `Ab
 
 ---
 
+### OverCrooking (`wnir:over_crooking`)
+
+Hoe enchantment. When breaking leaves with an OverCrooking-enchanted hoe, multiplies counts of all drops **except** saplings and sticks.
+
+| Level | Multiplier |
+|-------|-----------|
+| I | ×2 |
+| II | ×3 |
+| III | ×4 |
+
+Uses `BlockDropsEvent`. Available at enchanting table.
+
+---
+
 ### Toughness (`wnir:toughness`)
 
 Armor toughness bonus via `ARMOR_TOUGHNESS` attribute (`ADD_VALUE`).
@@ -361,7 +427,7 @@ Applied via transient modifier on `PlayerTickEvent.Post`.
 
 Tab ID: `wnir:wnir`. Title: "When Nothing Is Ready". Icon: chunk_loader.
 
-Contains: chunk_loader, spawner_agitator, warding_post, teleporter_inhibitor, repelling_post, antiwither, ee_clock, mossy_hopper.
+Contains: chunk_loader, spawner_agitator, warding_post, teleporter_inhibitor, repelling_post, antiwither, ee_clock, mossy_hopper, ee_clock_budding_crystal, teleporter_crystal, personal_dimension_teleporter, blue_sticky_tape.
 
 ---
 
@@ -390,6 +456,13 @@ Contains: chunk_loader, spawner_agitator, warding_post, teleporter_inhibitor, re
 20. **`@EventBusSubscriber.bus()` ignored in NeoForge FML 4** — event bus routing is automatic via `IModBusEvent` interface; omit the `bus` parameter entirely.
 21. **MapCodec covariant override:** subclass of `HopperBlock` cannot return `MapCodec<SubType>` — cast via `(MapCodec<HopperBlock>)(MapCodec<?>) CODEC` with `@SuppressWarnings("unchecked")`.
 22. **Recipe key format:** use plain string `"M": "minecraft:item"` not object `"M": {"item": "..."}` — both valid in spec but plain string matches vanilla/working examples in this codebase.
+24. **`SpecialModelRenderer` for item rendering:** register via `RegisterSpecialModelRendererEvent` in `@EventBusSubscriber` client class. JSON item model uses `"type": "minecraft:special"` with `"model": {"type": "wnir:renderer_id"}`. `MapCodec<Unbaked>` registered as codec.
+25. **`BlockStateModel` (1.21.11):** `mc.getBlockRenderer().getBlockModelShaper().getBlockModel(state)` returns `BlockStateModel`. Call `model.collectParts(RandomSource)` → `List<BlockModelPart>` (deprecated but functional). `BlockModelPart.getQuads(Direction)` → `List<BakedQuad>`. `BakedQuad` is now a Java record — use `.sprite()` accessor (not `.getSprite()`).
+26. **`DynamicTexture` for generated textures:** `new DynamicTexture(() -> "debug_name", nativeImage)`. Register via `Minecraft.getInstance().getTextureManager().register(Identifier, texture)`. Use as `RenderTypes.itemEntityTranslucentCull(identifier)`.
+27. **Container dupe bug on Blue Sticky Tape pickup:** call `container.clearContent()` before `level.removeBlock()` to prevent the block entity dropping its inventory contents on removal.
+28. **`Item.getName(ItemStack)` override:** returns the display name; use to customise name for data-carrying items like Blue Sticky Tape (shows "Wrapped X" when filled).
+29. **`appendHoverText` signature (1.21.11):** `(ItemStack, Item.TooltipContext, TooltipDisplay, Consumer<Component>, TooltipFlag)` — consumer replaces `List<Component>`.
+30. **Item NBT format (1.21.x codec):** `"Slot"` (uppercase), `"id"` (lowercase), `"count"` (lowercase). `CompoundTag.getList(key)` returns `Optional<ListTag>` — no type param.
 23. **Loot modifier conditions broken:** `neoforge:loot_table_id` conditions in global loot modifiers may not filter correctly in 1.21.11 — modifier fires on all loot tables. Removed all enchantment-via-loot machinery; enchants available at enchanting table only.
 
 ---
@@ -398,6 +471,6 @@ Contains: chunk_loader, spawner_agitator, warding_post, teleporter_inhibitor, re
 
 - Automated tests
 - Client-side rendering (custom block entity renderers)
-- GUI / screen for any block except Mossy Hopper (which has one)
+- GUI / screen for blocks other than Mossy Hopper, EE Clock Budding Crystal, and Teleporter Crystal (all three have screens)
 - Cross-mod API / capability integration
 - Config file (no user-configurable parameters currently)

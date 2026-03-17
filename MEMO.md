@@ -57,9 +57,33 @@ Deploy: `make build`, then copy jar from `build/libs/` to test instance.
 - **HomingArcheryHandler** — cancels arrow, spawns `ShulkerBullet`; tracks damage via `ConcurrentHashMap<UUID, TrackedBullet>` (stale entries cleaned after 60s).
 - **InsaneLightHandler** — 2× mob `FOLLOW_RANGE` via `ADD_MULTIPLIED_BASE + 1.0`; refreshed every 40 ticks.
 
-## New Blocks Added
+## New Blocks/Items Added
 
 - **MossyHopperBlock** — extends `HopperBlock`. 10-slot sorter hopper. `MossyHopperBlockEntity` extends `RandomizableContainerBlockEntity`, implements `Hopper`. Never ejects last item. 2 items/8 ticks from random eligible slots. GUI via `MossyHopperMenu` + `MossyHopperScreen`. Client setup in `WnirClientSetup` (`@EventBusSubscriber`, `RegisterMenuScreensEvent`).
+- **EEClockBuddingCrystalBlock/BE/Menu/Screen** — grows over 168000 ticks (÷ EE Clock column height below). Transforms into `EEClockBlock` when complete. Created when budding amethyst is placed on EE Clock column. Does NOT accelerate via EE Clock ticker (guarded in `EEClockBlockEntity`).
+- **TeleporterCrystalBlock/BE/Menu/Screen** — same growth schedule; requires 16 ender pearls (14 via GUI + 2 at transform). Created when crying obsidian is placed on EE Clock column. Transforms into `PersonalDimensionTeleporterBlock`.
+- **PersonalDimensionTeleporterBlock** — teleports player to `wnir:personal` dimension. Head mechanic: player skull → owner only; mob skull → any player; no skull → locked. Requires full hunger (20/20); drains hunger to 0 on use. Per-player X-axis regions (`PersonalBiomeSource.REGION_WIDTH` wide), spawn on surface at region center.
+- **BlueStickyTapeItem** — picks up any block (except bedrock/air) with full NBT; places back on right-click. Clears container before removal to prevent dupe. Name: "Wrapped \<block\>". Tooltip: container contents + spawner entity type.
+- **OverCrookingHandler** — hoe enchantment via `BlockDropsEvent`; multiplies leaf drops (not saplings/sticks) by `level + 1`.
+
+## Item Rendering — SpecialModelRenderer (1.21.11)
+
+```java
+// Register in @EventBusSubscriber(Dist.CLIENT):
+event.register(Identifier.fromNamespaceAndPath(MOD_ID, "my_renderer"), MyRenderer.MAP_CODEC);
+
+// MapCodec<Unbaked>:
+public static final MapCodec<Unbaked> MAP_CODEC = MapCodec.unit(new Unbaked());
+
+// JSON item model (items/my_item.json):
+{"model": {"type": "minecraft:special", "base": "...", "model": {"type": "wnir:my_renderer"}}}
+```
+
+- `BlockStateModel` from `mc.getBlockRenderer().getBlockModelShaper().getBlockModel(state)`
+- `model.collectParts(RandomSource)` → `List<BlockModelPart>` (deprecated; works)
+- `part.getQuads(Direction)` → `List<BakedQuad>`; `BakedQuad` is a record → `.sprite()` (not `.getSprite()`)
+- Sprite priority for "best face": SOUTH → UP → unculled quads (null dir) → `model.particleIcon()`
+- Generated texture: `new DynamicTexture(() -> "name", nativeImage)`; register with `TextureManager.register(Identifier, texture)`; use `RenderTypes.itemEntityTranslucentCull(id)` for render type
 
 ## Known Limitations / Issues
 
