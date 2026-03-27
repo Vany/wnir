@@ -1,6 +1,7 @@
 package com.wnir;
 
 import java.util.Set;
+import java.util.function.BiFunction;
 import java.util.function.Function;
 import java.util.function.Supplier;
 import net.minecraft.core.Holder;
@@ -19,15 +20,23 @@ import net.minecraft.world.flag.FeatureFlags;
 import net.minecraft.world.inventory.MenuType;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.Blocks;
+import net.minecraft.world.level.block.LiquidBlock;
 import net.minecraft.world.level.block.SoundType;
 import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.block.entity.BlockEntityType;
 import net.minecraft.world.level.block.state.BlockBehaviour;
 import net.minecraft.world.level.material.MapColor;
 import net.minecraft.world.level.biome.BiomeSource;
+import net.minecraft.world.item.BucketItem;
+import net.minecraft.world.item.Items;
+import net.minecraft.world.level.material.FlowingFluid;
+import net.minecraft.world.level.material.Fluid;
 import net.neoforged.bus.api.IEventBus;
+import net.neoforged.neoforge.fluids.BaseFlowingFluid;
+import net.neoforged.neoforge.fluids.FluidType;
 import net.neoforged.neoforge.registries.DeferredHolder;
 import net.neoforged.neoforge.registries.DeferredRegister;
+import net.neoforged.neoforge.registries.NeoForgeRegistries;
 
 public final class WnirRegistries {
 
@@ -66,12 +75,56 @@ public final class WnirRegistries {
             new Potion("martial_lightning", new MobEffectInstance(MARTIAL_LIGHTNING, 3600, 0))
         );
 
-    // ── Block registration ───────────────────────────────────────────────
+    // ── Block / Item registers (declared early; ITEMS needed before fluid bucket) ──
 
     private static final DeferredRegister<Block> BLOCKS =
         DeferredRegister.create(BuiltInRegistries.BLOCK, WnirMod.MOD_ID);
     private static final DeferredRegister<Item> ITEMS =
         DeferredRegister.create(BuiltInRegistries.ITEM, WnirMod.MOD_ID);
+
+    // ── Fluids ───────────────────────────────────────────────────────────
+
+    private static final DeferredRegister<FluidType> FLUID_TYPES =
+        DeferredRegister.create(NeoForgeRegistries.FLUID_TYPES, WnirMod.MOD_ID);
+    private static final DeferredRegister<Fluid> FLUIDS =
+        DeferredRegister.create(BuiltInRegistries.FLUID, WnirMod.MOD_ID);
+
+    // Set in static block below after all supplier fields are initialized.
+    static BaseFlowingFluid.Properties MAGIC_CELLULOSE_FLUID_PROPS;
+
+    public static final DeferredHolder<FluidType, FluidType> MAGIC_CELLULOSE_TYPE =
+        FLUID_TYPES.register("magic_cellulose", () -> new FluidType(FluidType.Properties.create()));
+
+    public static final DeferredHolder<Fluid, FlowingFluid> MAGIC_CELLULOSE_STILL =
+        FLUIDS.register("magic_cellulose", () -> new BaseFlowingFluid.Source(MAGIC_CELLULOSE_FLUID_PROPS));
+    public static final DeferredHolder<Fluid, FlowingFluid> MAGIC_CELLULOSE_FLOWING =
+        FLUIDS.register("magic_cellulose_flowing", () -> new BaseFlowingFluid.Flowing(MAGIC_CELLULOSE_FLUID_PROPS));
+
+    // BLOCKS registers after FLUIDS, so MAGIC_CELLULOSE_STILL.get() is safe in this lambda.
+    public static final DeferredHolder<Block, LiquidBlock> MAGIC_CELLULOSE_BLOCK =
+        BLOCKS.register("magic_cellulose_block", () -> new LiquidBlock(
+            MAGIC_CELLULOSE_STILL.get(),
+            BlockBehaviour.Properties.ofFullCopy(Blocks.WATER)
+                .setId(ResourceKey.create(Registries.BLOCK, id("magic_cellulose_block")))
+        ));
+
+    public static final Supplier<BucketItem> MAGIC_CELLULOSE_BUCKET =
+        ITEMS.register("magic_cellulose_bucket", () ->
+            new BucketItem(MAGIC_CELLULOSE_STILL.get(),
+                new Item.Properties()
+                    .craftRemainder(Items.BUCKET)
+                    .stacksTo(1)
+                    .setId(ResourceKey.create(Registries.ITEM, id("magic_cellulose_bucket")))
+            )
+        );
+
+    static {
+        MAGIC_CELLULOSE_FLUID_PROPS = new BaseFlowingFluid.Properties(
+            MAGIC_CELLULOSE_TYPE, MAGIC_CELLULOSE_STILL, MAGIC_CELLULOSE_FLOWING
+        ).block(MAGIC_CELLULOSE_BLOCK).bucket(MAGIC_CELLULOSE_BUCKET);
+    }
+
+    // ── Block registration ───────────────────────────────────────────────
 
     @SuppressWarnings("unchecked")
     private static final DeferredRegister<BlockEntityType<?>> BLOCK_ENTITIES =
@@ -118,12 +171,22 @@ public final class WnirRegistries {
         BlockEntityType.BlockEntitySupplier<E> entityFactory,
         BlockBehaviour.Properties props
     ) {
+        return registerBlock(name, blockFactory, entityFactory, props, BlockItem::new);
+    }
+
+    private static <B extends Block, E extends BlockEntity> BlockBundle<B, E> registerBlock(
+        String name,
+        Function<BlockBehaviour.Properties, B> blockFactory,
+        BlockEntityType.BlockEntitySupplier<E> entityFactory,
+        BlockBehaviour.Properties props,
+        BiFunction<B, Item.Properties, BlockItem> itemFactory
+    ) {
         var blockKey = ResourceKey.create(Registries.BLOCK, id(name));
         var itemKey  = ResourceKey.create(Registries.ITEM,  id(name));
 
         Supplier<B> block = BLOCKS.register(name, () -> blockFactory.apply(props.setId(blockKey)));
         Supplier<BlockItem> item = ITEMS.register(name, () ->
-            new BlockItem(block.get(), new Item.Properties().setId(itemKey))
+            itemFactory.apply(block.get(), new Item.Properties().setId(itemKey))
         );
         Supplier<BlockEntityType<E>> entity = BLOCK_ENTITIES.register(
             name, () -> new BlockEntityType<>(entityFactory, Set.of(block.get()))
@@ -222,6 +285,23 @@ public final class WnirRegistries {
                 .strength(1.5f)
                 .requiresCorrectToolForDrops());
 
+    private static final BlockBundle<SkullBeehiveBlock, SkullBeehiveBlockEntity> SKULL_BEEHIVE =
+        registerBlock("skull_beehive", SkullBeehiveBlock::new, SkullBeehiveBlockEntity::new,
+            BlockBehaviour.Properties.of()
+                .mapColor(MapColor.COLOR_BROWN)
+                .sound(SoundType.WOOD)
+                .strength(2.0f)
+                .requiresCorrectToolForDrops(),
+            BlockItem::new);
+
+    private static final BlockBundle<CelluloserBlock, CelluloserBlockEntity> CELLULOSER =
+        registerBlock("celluloser", CelluloserBlock::new, CelluloserBlockEntity::new,
+            BlockBehaviour.Properties.of()
+                .mapColor(MapColor.COLOR_GREEN)
+                .sound(SoundType.METAL)
+                .strength(3.5f)
+                .requiresCorrectToolForDrops());
+
     // ── Standalone items ─────────────────────────────────────────────────
 
     public static final Supplier<BlueStickyTapeItem> BLUE_STICKY_TAPE_ITEM =
@@ -244,6 +324,12 @@ public final class WnirRegistries {
     public static final Supplier<MenuType<TeleporterCrystalMenu>> TELEPORTER_CRYSTAL_MENU =
         MENU_TYPES.register("teleporter_crystal", () -> new MenuType<>(TeleporterCrystalMenu::new, FeatureFlags.VANILLA_SET));
 
+    public static final Supplier<MenuType<SkullBeehiveMenu>> SKULL_BEEHIVE_MENU =
+        MENU_TYPES.register("skull_beehive", () -> new MenuType<>(SkullBeehiveMenu::new, FeatureFlags.VANILLA_SET));
+
+    public static final Supplier<MenuType<CelluloserMenu>> CELLULOSER_MENU =
+        MENU_TYPES.register("celluloser", () -> new MenuType<>(CelluloserMenu::new, FeatureFlags.VANILLA_SET));
+
     public static final Supplier<BlockEntityType<MossyHopperBlockEntity>> MOSSY_HOPPER_BE = MOSSY_HOPPER.entity;
     public static final Supplier<BlockItem> MOSSY_HOPPER_ITEM = MOSSY_HOPPER.item;
 
@@ -256,6 +342,13 @@ public final class WnirRegistries {
     public static final Supplier<BlockEntityType<TeleporterCrystalBlockEntity>> TELEPORTER_CRYSTAL_BE = TELEPORTER_CRYSTAL.entity;
     public static final Supplier<TeleporterCrystalBlock> TELEPORTER_CRYSTAL_BLOCK = TELEPORTER_CRYSTAL.block;
     public static final Supplier<PersonalDimensionTeleporterBlock> PERSONAL_DIMENSION_TELEPORTER_BLOCK = PERSONAL_DIMENSION_TELEPORTER.block;
+
+    public static final Supplier<BlockEntityType<SkullBeehiveBlockEntity>> SKULL_BEEHIVE_BE = SKULL_BEEHIVE.entity;
+    public static final Supplier<SkullBeehiveBlock> SKULL_BEEHIVE_BLOCK = SKULL_BEEHIVE.block;
+    public static final Supplier<BlockItem> SKULL_BEEHIVE_ITEM = SKULL_BEEHIVE.item;
+
+    public static final Supplier<BlockEntityType<CelluloserBlockEntity>> CELLULOSER_BE = CELLULOSER.entity;
+    public static final Supplier<BlockItem> CELLULOSER_ITEM = CELLULOSER.item;
 
     public static final Supplier<BlockItem> CHUNK_LOADER_ITEM = CHUNK_LOADER.item;
     public static final Supplier<BlockItem> SPAWNER_AGITATOR_ITEM = SPAWNER_AGITATOR.item;
@@ -289,6 +382,9 @@ public final class WnirRegistries {
                     output.accept(MOSSY_HOPPER_ITEM.get());
                     output.accept(PERSONAL_DIMENSION_TELEPORTER_ITEM.get());
                     output.accept(BLUE_STICKY_TAPE_ITEM.get());
+                    output.accept(SKULL_BEEHIVE_ITEM.get());
+                    output.accept(MAGIC_CELLULOSE_BUCKET.get());
+                    output.accept(CELLULOSER_ITEM.get());
                 })
                 .build()
         );
@@ -298,6 +394,8 @@ public final class WnirRegistries {
     static void register(IEventBus modEventBus) {
         MOB_EFFECTS.register(modEventBus);
         POTIONS.register(modEventBus);
+        FLUID_TYPES.register(modEventBus);
+        FLUIDS.register(modEventBus);
         BLOCKS.register(modEventBus);
         ITEMS.register(modEventBus);
         BLOCK_ENTITIES.register(modEventBus);

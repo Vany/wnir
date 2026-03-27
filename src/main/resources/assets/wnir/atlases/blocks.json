@@ -1,0 +1,12 @@
+{
+  "sources": [
+    {
+      "type": "minecraft:single",
+      "resource": "wnir:block/magic_cellulose_still"
+    },
+    {
+      "type": "minecraft:single",
+      "resource": "wnir:block/magic_cellulose_flow"
+    }
+  ]
+}

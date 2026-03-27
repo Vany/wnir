@@ -30,9 +30,9 @@ public class TeleporterCrystalMenu extends AbstractContainerMenu {
     static final int IMG_H        = 166;
     static final int PEARL_SLOT_X = 80;
     static final int PEARL_SLOT_Y = 20;
-    static final int INV_X        = 8;
-    static final int INV_Y        = 84;
-    static final int HOTBAR_Y     = 142;
+    static final int INV_X        = 9;
+    static final int INV_Y        = 85;
+    static final int HOTBAR_Y     = 143;
 
     private final ContainerData data;
 

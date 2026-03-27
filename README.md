@@ -24,6 +24,10 @@ A standalone NeoForge mod for Minecraft 1.21.11 that fills gaps in vanilla gamep
   - [Personal Dimension Teleporter](#personal-dimension-teleporter)
   - [Mossy Hopper](#mossy-hopper)
   - [Anti-Wither Block](#anti-wither-block)
+  - [Skull Beehive](#skull-beehive)
+  - [Celluloser](#celluloser)
+- [Fluids](#fluids)
+  - [Magic Cellulose](#magic-cellulose)
 - [Items](#items)
   - [Blue Sticky Tape](#blue-sticky-tape)
 - [Mob Effects](#mob-effects)
@@ -192,6 +196,67 @@ Explosion-immune decorative block. Withstands Wither skulls, Creeper and TNT exp
 | **Blast resistance** | 3,600,000 |
 | **Recipe** | Shaped: 8× obsidian + 1× nether star in centre (`"OOO" / "ONO" / "OOO"`) |
 | **Tool** | Diamond pickaxe or better |
+
+---
+
+### Skull Beehive
+
+An automated turret that fires arrows at nearby hostile mobs. Load it with bows, arrows, and gunpowder and it handles the rest.
+
+| | |
+|---|---|
+| **Range** | 24 blocks (spherical) |
+| **Targets** | All hostile mobs (`Enemy` implementors) — Wither, Warden, Ender Dragon, Ravager, Elder Guardian, etc. Endermen excluded |
+| **Ammo cost** | 1 arrow + 1 gunpowder per shot |
+| **Shot cooldown** | 2 ticks |
+| **Damage** | (2.0 + Power bonus) × 2.0, always critical |
+| **Recipe** | `" S " / "SHS" / " S "` — S = skeleton skull, H = beehive |
+| **Tool** | Axe |
+
+**Inventory (136 slots):**
+
+| Slots | Purpose |
+|-------|---------|
+| 0–5 | Bow / crossbow weapons (mixed ok) |
+| 6 | Arrow receiver → drains into arrow storage |
+| 7 | Gunpowder receiver → drains into gunpowder storage |
+| 8–71 | Arrow storage (64 slots, max 1024 total) |
+| 72–135 | Gunpowder storage (64 slots, max 1024 total) |
+
+- Selects the **least-damaged, reload-ready** weapon each shot
+- Weapons about to break are excluded automatically (plays click sound); replace or repair to re-enable
+- Supports Flame (5s fire) and Power enchants on the bows
+- Arrow type chosen at random from storage — tipped and spectral arrows work
+- **Sneak + right-click** to pick the block up with all contents preserved
+
+---
+
+### Celluloser
+
+Processes enchanted books, water, and Forge Energy into **Magic Cellulose** fluid.
+
+| | |
+|---|---|
+| **Inputs** | Enchanted book (any enchant level) + water + FE |
+| **Output** | Magic Cellulose fluid |
+| **Recipe** | Shaped: emerald / brush / shears / lectern / gold ingot |
+| **Tool** | Pickaxe |
+
+Right-click to open the GUI showing energy bar, water tank, cellulose tank, and progress arrow. Contents are preserved when the block is mined.
+
+---
+
+## Fluids
+
+### Magic Cellulose
+
+A pale-pink fluid produced by the Celluloser. Collect it with a bucket to get a **Magic Cellulose Bucket**.
+
+| | |
+|---|---|
+| **Source** | Celluloser block |
+| **Bucket** | `wnir:magic_cellulose_bucket` |
+| **Color** | Pale pink |
 
 ---
 
@@ -372,7 +437,7 @@ Output: `build/libs/wnir-1.21.11-1.0.0.jar`
 
 ## Compatibility
 
-- No external mod dependencies
+- **Requires:** GeckoLib 5.4.5 (`geckolib-neoforge-1.21.11`) — used for Skull Beehive animations
 - No client-side-only components (fully server-safe)
 - No config file — all values are fixed by design
 - 1.21.11 only — no cross-version compatibility shims

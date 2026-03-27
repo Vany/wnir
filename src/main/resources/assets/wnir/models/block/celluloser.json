@@ -1,0 +1,12 @@
+{
+  "parent": "minecraft:block/cube",
+  "textures": {
+    "down":     "wnir:block/celluloser_bottom",
+    "up":       "wnir:block/celluloser_top",
+    "north":    "wnir:block/celluloser_side",
+    "south":    "wnir:block/celluloser_side",
+    "west":     "wnir:block/celluloser_side",
+    "east":     "wnir:block/celluloser_side",
+    "particle": "wnir:block/celluloser_side"
+  }
+}

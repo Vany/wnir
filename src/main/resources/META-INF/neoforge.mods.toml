@@ -22,3 +22,10 @@ type = "required"
 versionRange = "${minecraft_version_range}"
 ordering = "NONE"
 side = "BOTH"
+
+[[dependencies.wnir]]
+modId = "geckolib"
+type = "required"
+versionRange = "[5.4.5,)"
+ordering = "NONE"
+side = "BOTH"

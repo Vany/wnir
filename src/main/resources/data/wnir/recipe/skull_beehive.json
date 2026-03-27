@@ -1,0 +1,17 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "pattern": [
+    " S ",
+    "SHS",
+    " S "
+  ],
+  "key": {
+    "S": "minecraft:skeleton_skull",
+    "H": "minecraft:beehive"
+  },
+  "result": {
+    "id": "wnir:skull_beehive",
+    "count": 1
+  },
+  "category": "misc"
+}

@@ -1,0 +1,19 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "pattern": [
+    "EBE",
+    "SLS",
+    "GEG"
+  ],
+  "key": {
+    "E": "minecraft:emerald",
+    "B": "minecraft:brush",
+    "S": "minecraft:shears",
+    "L": "minecraft:lectern",
+    "G": "minecraft:gold_ingot"
+  },
+  "result": {
+    "id": "wnir:celluloser",
+    "count": 1
+  }
+}

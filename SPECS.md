@@ -26,6 +26,10 @@
 - [x] Teleporter Crystal block (crying obsidian + EE Clock column → grows → becomes Personal Dimension Teleporter)
 - [x] Blue Sticky Tape item (picks up any block with full NBT; renders wrapped block face + blue cross)
 - [x] OverCrooking enchantment (hoe enchant; multiplies leaf drops except saplings/sticks)
+- [x] Skull Beehive turret block (GeckoLib idle animation wired; shooting animation TODO)
+- [x] Celluloser block (enchanted book + water + FE → magic cellulose fluid)
+- [x] Magic Cellulose fluid + bucket item
+- [x] Martial Lightning potion (Awkward + Golden Sword)
 - [~] Enchanted weapons in dungeon loot — REMOVED (loot modifier conditions broken in 1.21.11; enchants available at enchanting table only)
 - [~] Enchantment books in dungeon loot — REMOVED (same reason)
 - [x] EE Clock in End City loot
@@ -44,7 +48,7 @@
 | Minecraft | 1.21.11 |
 | Mod loader | NeoForge 21.11.38-beta |
 | Java | 21+ |
-| External deps | None (std lib only) |
+| External deps | GeckoLib 5.4.5 (`geckolib-neoforge-1.21.11`) |
 | Side | Both (server: blocks/effects, client: none) |
 | Mod ID | `wnir` |
 | Package | `com.wnir` |
@@ -335,7 +339,7 @@ Indicator-only. No handler — reserved for external use.
 
 ---
 
-## 3. Potion
+## 3. Potions
 
 ### Mega Chanter (`wnir:mega_chanter`)
 
@@ -345,6 +349,14 @@ Potion of Mega Chanting. Applies `mega_chanter` effect for 3600 ticks (3 min), a
 Registered via `RegisterBrewingRecipesEvent` on `NeoForge.EVENT_BUS` (NOT modEventBus — it is not an `IModBusEvent` in 1.21.11).
 
 Splash and lingering variants available via vanilla brewing chain — not blocked.
+
+---
+
+### Martial Lightning (`wnir:martial_lightning`)
+
+Applies `martial_lightning` effect for 3600 ticks (3 min), amplifier 0.
+
+**Brewing:** Awkward Potion + Golden Sword → Martial Lightning Potion.
 
 ---
 
@@ -427,7 +439,7 @@ Applied via transient modifier on `PlayerTickEvent.Post`.
 
 Tab ID: `wnir:wnir`. Title: "When Nothing Is Ready". Icon: chunk_loader.
 
-Contains: chunk_loader, spawner_agitator, warding_post, teleporter_inhibitor, repelling_post, antiwither, ee_clock, mossy_hopper, ee_clock_budding_crystal, teleporter_crystal, personal_dimension_teleporter, blue_sticky_tape.
+Contains: chunk_loader, spawner_agitator, warding_post, teleporter_inhibitor, repelling_post, antiwither, ee_clock, ee_clock_budding_crystal, teleporter_crystal, mossy_hopper, personal_dimension_teleporter, blue_sticky_tape, skull_beehive, magic_cellulose_bucket, celluloser.
 
 ---
 
@@ -464,6 +476,100 @@ Contains: chunk_loader, spawner_agitator, warding_post, teleporter_inhibitor, re
 29. **`appendHoverText` signature (1.21.11):** `(ItemStack, Item.TooltipContext, TooltipDisplay, Consumer<Component>, TooltipFlag)` — consumer replaces `List<Component>`.
 30. **Item NBT format (1.21.x codec):** `"Slot"` (uppercase), `"id"` (lowercase), `"count"` (lowercase). `CompoundTag.getList(key)` returns `Optional<ListTag>` — no type param.
 23. **Loot modifier conditions broken:** `neoforge:loot_table_id` conditions in global loot modifiers may not filter correctly in 1.21.11 — modifier fires on all loot tables. Removed all enchantment-via-loot machinery; enchants available at enchanting table only.
+
+---
+
+---
+
+### Celluloser (`wnir:celluloser`)
+
+Converts enchanted books + water + FE into magic cellulose fluid.
+
+**Inputs:**
+- Enchanted book (1 slot) — consumed on start; XP calculated from enchantment min-cost formula
+- Water (tank, 16 000 mB)
+- FE energy (buffer 1 000 000 FE)
+
+**Output:** Magic Cellulose fluid (tank, 16 000 mB)
+
+**Processing parameters (public static, editable at runtime):**
+
+| Field | Default | Meaning |
+|-------|---------|---------|
+| `XP_PER_TICK` | 200 | XP processed per server tick |
+| `FE_PER_XP` | 100 | FE consumed per XP point |
+| `WATER_PER_XP` | 1 | mB water consumed per XP |
+| `OUTPUT_DIVISOR` | 10 | XP / divisor = mB cellulose produced |
+| `TANK_CAPACITY` | 16 000 | mB per tank |
+| `ENERGY_CAPACITY` | 1 000 000 | max FE buffer |
+
+**Behaviour:**
+- Pauses (preserves progress) when energy, water, or output space is exhausted
+- Processing resumes automatically when resources are available
+- XP calculated as sum of `levelToXp((minCost + maxCost) / 2)` per enchantment
+
+**NeoForge capabilities (registered in `WnirMod`):**
+- `Capabilities.Energy.BLOCK` → `be.energyHandler` (insert only, all faces)
+- `Capabilities.Fluid.BLOCK` → `be.fluidHandler` (insert water slot 0; extract cellulose slot 1)
+
+**GUI:** energy bar (fills from bottom) + water tank + cellulose tank + progress arrow. Texture `textures/gui/container/celluloser.png` (256×256). Fill sprites packed at y=168.
+
+**Recipe:** shaped — `"EBE" / "SLS" / "GEG"` (E=emerald, B=brush, S=shears, L=lectern, G=gold_ingot).
+
+**Properties:** green map color, metal sound, strength 3.5, `requiresCorrectToolForDrops()`. State preserved on mine via `copy_components` on `block_entity_data`.
+
+---
+
+### Magic Cellulose Fluid (`wnir:magic_cellulose`)
+
+Custom fluid produced by the Celluloser. Still + flowing variants. Bucket item: `wnir:magic_cellulose_bucket`.
+
+Textures: `textures/block/magic_cellulose_still.png`, `textures/block/magic_cellulose_flow.png`.
+
+---
+
+### Skull Beehive (`wnir:skull_beehive`)
+
+Turret block that automatically shoots arrows at hostile mobs.
+
+**Recipe:** `" S " / "SHS" / " S "` — S = skeleton skull, H = beehive. Category: misc.
+
+**Inventory (136 slots total):**
+
+| Slots | Purpose | Rules |
+|-------|---------|-------|
+| 0-5 | Bow / crossbow weapons (mixed ok) | Insert: any bow/crossbow. Extract: only if weapon is excluded (damaged) |
+| 6 | Arrow receiver | Insert: arrows. Immediately drains to arrow storage |
+| 7 | Gunpowder receiver | Insert: gunpowder. Immediately drains to gunpowder storage |
+| 8-71 | Arrow storage (64 slots) | Max 1024 total. Arrows chosen at random per shot |
+| 72-135 | Gunpowder storage (64 slots) | Max 1024 total |
+
+**Shooting:**
+- Range: 24 blocks (spherical). Target: nearest hostile mob in range — any entity implementing `net.minecraft.world.entity.monster.Enemy` (Monster subclasses, EnderDragon, Slime, Ghast, etc.). Endermen excluded.
+- LoS: raycast to predicted mob position; aborts if blocked by blocks.
+- Prediction: iterative gravity-compensated prediction using mob horizontal velocity.
+- Cost per shot: 1 arrow + 1 gunpowder.
+- Arrow velocity: base (bow=3.0, crossbow=3.15) × 2.0.
+- Arrow damage: (2.0 + Power enchant bonus) × 2.0. Always critical.
+- Flame enchant: 5s fire on target.
+- Shot cooldown: 2 ticks between shots.
+
+**Weapon management:**
+- Weapon reload: bow = 20 ticks, crossbow = `CrossbowItem.getChargeDuration(stack, null)`.
+- Best weapon = least damaged, reload finished, not excluded.
+- If durability ≤ 1 before shot: play `DISPENSER_FAIL` sound, mark excluded, skip.
+- Exclusion cleared when slot receives a fresh/repaired weapon (durability > 1).
+- Durability reduced by 1 per shot via `hurtAndBreak`.
+
+**GUI (slots 0-7 only; storage slots hidden from GUI):**
+- Row 1 (y=20): 6 bow slots.
+- Row 2 (y=42): arrow receiver + gunpowder receiver.
+- Progress bars (y=64, y=76): arrow count / gunpowder count (client-synced via ContainerData).
+- Texture: stub uses mossy_hopper.png placeholder.
+
+**GeckoLib:** `SkullBeehiveBlockEntity` implements `GeoBlockEntity`. `SkullBeehiveGeoModel` registered. Idle animation loops (`animation.skull_beehive.idle`). `RenderShape.INVISIBLE` — rendered entirely by GeckoLib. Model at `assets/wnir/geo/skull_beehive.geo.json`; animation at `assets/wnir/animations/skull_beehive.animation.json`. Shooting animation not yet defined.
+
+**Drop on break:** loot table uses `copy_components` → `block_entity_data`; all 136 slots preserved in the dropped item and restored on placement.
 
 ---
 

@@ -45,6 +45,12 @@ public class EEClockBuddingCrystalBlockEntity extends BlockEntity implements Men
     private int ticksAccumulated = 0;
     private int currentPearlFuel = 0;
 
+    // Cached column height — O(n) scan runs at most once every CLOCKS_RECHECK ticks.
+    // -1 = dirty (forces recompute on the very first tick after load).
+    private int cachedClocks = -1;
+    private int clocksTimer  = 0;
+    private static final int CLOCKS_RECHECK = 40;
+
     /** Single-slot container for ender pearls, notifies this BE on change. */
     final SimpleContainer pearlContainer = new SimpleContainer(1) {
         @Override
@@ -63,7 +69,12 @@ public class EEClockBuddingCrystalBlockEntity extends BlockEntity implements Men
     public static void serverTick(
         Level level, BlockPos pos, BlockState state, EEClockBuddingCrystalBlockEntity be
     ) {
-        int clocks = countEEClocksBelow(level, pos);
+        // Recompute column height at most once every CLOCKS_RECHECK ticks.
+        if (++be.clocksTimer >= CLOCKS_RECHECK || be.cachedClocks < 0) {
+            be.clocksTimer  = 0;
+            be.cachedClocks = countEEClocksBelow(level, pos);
+        }
+        int clocks = be.cachedClocks;
         if (clocks == 0) return;
 
         // Burn `clocks` fuel ticks per game tick so total pearl consumption
@@ -118,7 +129,7 @@ public class EEClockBuddingCrystalBlockEntity extends BlockEntity implements Men
             @Override public int get(int i) {
                 return switch (i) {
                     case 0 -> (int)((long) ticksAccumulated * 10000 / BASE_TICKS);
-                    case 1 -> countEEClocksBelow(level, worldPosition);
+                    case 1 -> cachedClocks < 0 ? countEEClocksBelow(level, worldPosition) : cachedClocks;
                     case 2 -> currentPearlFuel * 1000 / PEARL_FUEL_TICKS;
                     default -> 0;
                 };
@@ -157,7 +168,8 @@ public class EEClockBuddingCrystalBlockEntity extends BlockEntity implements Men
     public void onLoad() {
         super.onLoad();
         if (level instanceof ServerLevel serverLevel) {
-            if (countEEClocksBelow(serverLevel, worldPosition) == 0) {
+            cachedClocks = countEEClocksBelow(serverLevel, worldPosition);
+            if (cachedClocks == 0) {
                 serverLevel.setBlock(worldPosition,
                     net.minecraft.world.level.block.Blocks.BUDDING_AMETHYST.defaultBlockState(), 3);
             }

@@ -4,7 +4,10 @@ import net.neoforged.bus.api.EventPriority;
 import net.neoforged.bus.api.IEventBus;
 import net.neoforged.fml.ModContainer;
 import net.neoforged.fml.common.Mod;
+import net.neoforged.neoforge.capabilities.Capabilities;
+import net.neoforged.neoforge.capabilities.RegisterCapabilitiesEvent;
 import net.neoforged.neoforge.common.NeoForge;
+import net.neoforged.neoforge.transfer.item.VanillaContainerWrapper;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
@@ -16,6 +19,24 @@ public class WnirMod {
 
     public WnirMod(IEventBus modEventBus, ModContainer modContainer) {
         WnirRegistries.register(modEventBus);
+
+        modEventBus.addListener((RegisterCapabilitiesEvent event) -> {
+            event.registerBlockEntity(
+                Capabilities.Item.BLOCK,
+                WnirRegistries.SKULL_BEEHIVE_BE.get(),
+                (be, side) -> VanillaContainerWrapper.of(be)
+            );
+            event.registerBlockEntity(
+                Capabilities.Energy.BLOCK,
+                WnirRegistries.CELLULOSER_BE.get(),
+                (be, side) -> be.energyHandler
+            );
+            event.registerBlockEntity(
+                Capabilities.Fluid.BLOCK,
+                WnirRegistries.CELLULOSER_BE.get(),
+                (be, side) -> be.fluidHandler
+            );
+        });
 
         NeoForge.EVENT_BUS.addListener(MartialLightningHandler::onLivingIncomingDamage);
         NeoForge.EVENT_BUS.addListener(DeadBlowHandler::onLivingIncomingDamage);

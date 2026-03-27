@@ -45,5 +45,13 @@
   "block.wnir.teleporter_crystal": "Teleporter Crystal",
   "item.wnir.teleporter_crystal": "Teleporter Crystal",
   "item.wnir.blue_sticky_tape": "Blue Sticky Tape",
-  "item.wnir.blue_sticky_tape.wrapped": "Wrapped %s"
+  "item.wnir.blue_sticky_tape.wrapped": "Wrapped %s",
+  "block.wnir.skull_beehive": "Skull Beehive",
+  "item.wnir.skull_beehive": "Skull Beehive",
+  "container.wnir.skull_beehive": "Skull Beehive",
+  "fluid_type.wnir.magic_cellulose": "Magic Cellulose",
+  "item.wnir.magic_cellulose_bucket": "Magic Cellulose Bucket",
+  "block.wnir.celluloser": "Celluloser",
+  "item.wnir.celluloser": "Celluloser",
+  "container.wnir.celluloser": "Celluloser"
 }
