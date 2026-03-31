@@ -55,5 +55,7 @@
   "item.wnir.celluloser": "Celluloser",
   "container.wnir.celluloser": "Celluloser",
   "item.wnir.mousey_compass": "Mousey Compass",
-  "item.wnir.wireless_fuel": "Wireless Fuel"
+  "item.wnir.wireless_fuel": "Wireless Fuel",
+  "block.wnir.accumulator": "Accumulator",
+  "item.wnir.accumulator": "Accumulator"
 }

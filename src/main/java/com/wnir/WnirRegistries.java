@@ -36,6 +36,7 @@ import net.minecraft.world.level.material.Fluid;
 import net.neoforged.bus.api.IEventBus;
 import net.neoforged.neoforge.fluids.BaseFlowingFluid;
 import net.neoforged.neoforge.fluids.FluidType;
+import net.minecraft.world.item.crafting.RecipeSerializer;
 import net.neoforged.neoforge.registries.DeferredHolder;
 import net.neoforged.neoforge.registries.DeferredRegister;
 import net.neoforged.neoforge.registries.NeoForgeRegistries;
@@ -149,6 +150,16 @@ public final class WnirRegistries {
     @SuppressWarnings("unused")
     private static final java.util.function.Supplier<com.mojang.serialization.MapCodec<PersonalBiomeSource>>
         PERSONAL_BIOME_SOURCE = BIOME_SOURCES.register("personal", () -> PersonalBiomeSource.CODEC);
+
+    @SuppressWarnings("unchecked")
+    private static final DeferredRegister<RecipeSerializer<?>> RECIPE_SERIALIZERS =
+        DeferredRegister.create(
+            (net.minecraft.core.Registry<RecipeSerializer<?>>) (net.minecraft.core.Registry<?>) BuiltInRegistries.RECIPE_SERIALIZER,
+            WnirMod.MOD_ID
+        );
+
+    public static final Supplier<net.minecraft.world.item.crafting.CustomRecipe.Serializer<AccumulatorCombineRecipe>> ACCUMULATOR_COMBINE_RECIPE =
+        RECIPE_SERIALIZERS.register("accumulator_combine", () -> AccumulatorCombineRecipe.SERIALIZER);
 
     @SuppressWarnings("unchecked")
     private static final DeferredRegister<MenuType<?>> MENU_TYPES =
@@ -296,6 +307,14 @@ public final class WnirRegistries {
                 .requiresCorrectToolForDrops(),
             BlockItem::new);
 
+    private static final BlockBundle<AccumulatorBlock, AccumulatorBlockEntity> ACCUMULATOR =
+        registerBlock("accumulator", AccumulatorBlock::new, AccumulatorBlockEntity::new,
+            BlockBehaviour.Properties.of()
+                .mapColor(MapColor.COLOR_ORANGE)
+                .sound(SoundType.METAL)
+                .strength(3.5f)
+                .requiresCorrectToolForDrops());
+
     private static final BlockBundle<CelluloserBlock, CelluloserBlockEntity> CELLULOSER =
         registerBlock("celluloser", CelluloserBlock::new, CelluloserBlockEntity::new,
             BlockBehaviour.Properties.of()
@@ -372,6 +391,10 @@ public final class WnirRegistries {
     public static final Supplier<BlockEntityType<CelluloserBlockEntity>> CELLULOSER_BE = CELLULOSER.entity;
     public static final Supplier<BlockItem> CELLULOSER_ITEM = CELLULOSER.item;
 
+    public static final Supplier<BlockEntityType<AccumulatorBlockEntity>> ACCUMULATOR_BE = ACCUMULATOR.entity;
+    public static final Supplier<AccumulatorBlock> ACCUMULATOR_BLOCK = ACCUMULATOR.block;
+    public static final Supplier<BlockItem> ACCUMULATOR_ITEM = ACCUMULATOR.item;
+
     public static final Supplier<BlockItem> CHUNK_LOADER_ITEM = CHUNK_LOADER.item;
     public static final Supplier<BlockItem> SPAWNER_AGITATOR_ITEM = SPAWNER_AGITATOR.item;
     public static final Supplier<BlockItem> WARDING_POST_ITEM = WARDING_POST.item;
@@ -409,6 +432,7 @@ public final class WnirRegistries {
                     output.accept(SKULL_BEEHIVE_ITEM.get());
                     output.accept(MAGIC_CELLULOSE_BUCKET.get());
                     output.accept(CELLULOSER_ITEM.get());
+                    output.accept(ACCUMULATOR_ITEM.get());
                 })
                 .build()
         );
@@ -424,6 +448,7 @@ public final class WnirRegistries {
         ITEMS.register(modEventBus);
         BLOCK_ENTITIES.register(modEventBus);
         MENU_TYPES.register(modEventBus);
+        RECIPE_SERIALIZERS.register(modEventBus);
         CREATIVE_TABS.register(modEventBus);
         BIOME_SOURCES.register(modEventBus);
     }

@@ -1,0 +1,17 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "pattern": [
+    "BRB",
+    "RCR",
+    "BRB"
+  ],
+  "key": {
+    "B": "minecraft:iron_bars",
+    "R": "minecraft:blaze_rod",
+    "C": "minecraft:redstone_block"
+  },
+  "result": {
+    "id": "wnir:accumulator",
+    "count": 1
+  }
+}

@@ -32,6 +32,11 @@ public class WnirMod {
                 (be, side) -> be.energyHandler
             );
             event.registerBlockEntity(
+                Capabilities.Energy.BLOCK,
+                WnirRegistries.ACCUMULATOR_BE.get(),
+                (be, side) -> be.energyHandler
+            );
+            event.registerBlockEntity(
                 Capabilities.Fluid.BLOCK,
                 WnirRegistries.CELLULOSER_BE.get(),
                 (be, side) -> be.fluidHandler
@@ -50,7 +55,9 @@ public class WnirMod {
         NeoForge.EVENT_BUS.addListener(ToughnessHandler::onPlayerTick);
         NeoForge.EVENT_BUS.addListener(OverCrookingHandler::onBlockDrops);
         NeoForge.EVENT_BUS.addListener(MouseyCompassItem::onPlayerTick);
-        NeoForge.EVENT_BUS.addListener(WirelessFuelItem::onPlayerTick);
+        NeoForge.EVENT_BUS.addListener(WirelessFuelItem::onServerTickPre);
+        NeoForge.EVENT_BUS.addListener(WirelessFuelItem::onServerTick);
+        NeoForge.EVENT_BUS.addListener(WirelessFuelItem::onFurnaceFuelBurnTime);
         NeoForge.EVENT_BUS.addListener(
             EventPriority.LOWEST, WardingPostTeleportHandler::onEntityTeleport
         );
