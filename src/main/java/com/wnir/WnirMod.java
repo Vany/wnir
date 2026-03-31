@@ -49,6 +49,8 @@ public class WnirMod {
         NeoForge.EVENT_BUS.addListener(AccelerateHandler::onEntityJoinLevel);
         NeoForge.EVENT_BUS.addListener(ToughnessHandler::onPlayerTick);
         NeoForge.EVENT_BUS.addListener(OverCrookingHandler::onBlockDrops);
+        NeoForge.EVENT_BUS.addListener(MouseyCompassItem::onPlayerTick);
+        NeoForge.EVENT_BUS.addListener(WirelessFuelItem::onPlayerTick);
         NeoForge.EVENT_BUS.addListener(
             EventPriority.LOWEST, WardingPostTeleportHandler::onEntityTeleport
         );
@@ -97,5 +99,6 @@ public class WnirMod {
         WardingColumnBlockEntity.clearRegistry();
         ChunkLoaderData.reset();
         PersonalDimensionManager.reset();
+        MouseyCompassSearchManager.reset();
     }
 }

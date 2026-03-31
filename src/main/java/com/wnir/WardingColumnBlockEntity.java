@@ -7,7 +7,6 @@ import net.minecraft.core.BlockPos;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.entity.Mob;
-import net.minecraft.world.entity.monster.Enemy;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.block.entity.BlockEntityType;
@@ -106,7 +105,7 @@ public class WardingColumnBlockEntity extends BlockEntity {
             center.x + radius, center.y + VERTICAL_RANGE, center.z + radius
         );
 
-        for (Mob mob : level.getEntitiesOfClass(Mob.class, area, e -> e instanceof Enemy)) {
+        for (Mob mob : level.getEntitiesOfClass(Mob.class, area, Mob::isAggressive)) {
             Vec3 dir = mob.position().subtract(center);
             double dist = dir.horizontalDistance();
             if (dist < CENTER_EPSILON) { dir = new Vec3(1, 0, 0); dist = 1; }

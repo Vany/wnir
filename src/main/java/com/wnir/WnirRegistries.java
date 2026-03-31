@@ -15,6 +15,8 @@ import net.minecraft.world.effect.MobEffectInstance;
 import net.minecraft.world.item.BlockItem;
 import net.minecraft.world.item.CreativeModeTab;
 import net.minecraft.world.item.Item;
+import net.minecraft.world.item.component.LodestoneTracker;
+import net.minecraft.core.component.DataComponents;
 import net.minecraft.world.item.alchemy.Potion;
 import net.minecraft.world.flag.FeatureFlags;
 import net.minecraft.world.inventory.MenuType;
@@ -313,6 +315,26 @@ public final class WnirRegistries {
             )
         );
 
+    public static final Supplier<MouseyCompassItem> MOUSEY_COMPASS_ITEM =
+        ITEMS.register("mousey_compass", () ->
+            new MouseyCompassItem(
+                new Item.Properties()
+                    .stacksTo(1)
+                    .component(DataComponents.LODESTONE_TRACKER,
+                        new LodestoneTracker(java.util.Optional.empty(), false))
+                    .setId(ResourceKey.create(Registries.ITEM, id("mousey_compass")))
+            )
+        );
+
+    public static final Supplier<WirelessFuelItem> WIRELESS_FUEL_ITEM =
+        ITEMS.register("wireless_fuel", () ->
+            new WirelessFuelItem(
+                new Item.Properties()
+                    .stacksTo(1)
+                    .setId(ResourceKey.create(Registries.ITEM, id("wireless_fuel")))
+            )
+        );
+
     // ── Public accessors ─────────────────────────────────────────────────
 
     public static final Supplier<MenuType<MossyHopperMenu>> MOSSY_HOPPER_MENU =
@@ -382,6 +404,8 @@ public final class WnirRegistries {
                     output.accept(MOSSY_HOPPER_ITEM.get());
                     output.accept(PERSONAL_DIMENSION_TELEPORTER_ITEM.get());
                     output.accept(BLUE_STICKY_TAPE_ITEM.get());
+                    output.accept(MOUSEY_COMPASS_ITEM.get());
+                    output.accept(WIRELESS_FUEL_ITEM.get());
                     output.accept(SKULL_BEEHIVE_ITEM.get());
                     output.accept(MAGIC_CELLULOSE_BUCKET.get());
                     output.accept(CELLULOSER_ITEM.get());

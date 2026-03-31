@@ -1,0 +1,17 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "category": "misc",
+  "pattern": [
+    " C ",
+    "CXC",
+    " C "
+  ],
+  "key": {
+    "C": "minecraft:compass",
+    "X": "minecraft:chest"
+  },
+  "result": {
+    "id": "wnir:mousey_compass",
+    "count": 1
+  }
+}

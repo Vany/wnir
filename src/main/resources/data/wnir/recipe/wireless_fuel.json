@@ -1,0 +1,17 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "category": "misc",
+  "pattern": [
+    " B ",
+    "BCB",
+    " B "
+  ],
+  "key": {
+    "B": "minecraft:blaze_rod",
+    "C": "minecraft:compass"
+  },
+  "result": {
+    "id": "wnir:wireless_fuel",
+    "count": 1
+  }
+}

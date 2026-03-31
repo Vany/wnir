@@ -53,5 +53,7 @@
   "item.wnir.magic_cellulose_bucket": "Magic Cellulose Bucket",
   "block.wnir.celluloser": "Celluloser",
   "item.wnir.celluloser": "Celluloser",
-  "container.wnir.celluloser": "Celluloser"
+  "container.wnir.celluloser": "Celluloser",
+  "item.wnir.mousey_compass": "Mousey Compass",
+  "item.wnir.wireless_fuel": "Wireless Fuel"
 }
