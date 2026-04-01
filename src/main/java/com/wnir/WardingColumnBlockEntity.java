@@ -6,8 +6,10 @@ import java.util.concurrent.ConcurrentHashMap;
 import net.minecraft.core.BlockPos;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.server.level.ServerLevel;
+import net.minecraft.world.damagesource.DamageSource;
 import net.minecraft.world.entity.Mob;
 import net.minecraft.world.entity.monster.Enemy;
+import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.block.entity.BlockEntityType;
@@ -126,8 +128,13 @@ public class WardingColumnBlockEntity extends BlockEntity {
 
         if (be.hurtPostCount > 0) {
             float damage = HURT_DAMAGE * be.hurtPostCount;
+            // indirectMagic bypasses armor and attributes kills to the player so mobs drop full loot.
+            Player nearest = level.getNearestPlayer(pos.getX() + 0.5, pos.getY() + 0.5, pos.getZ() + 0.5, be.totalRadius, false);
+            DamageSource src = nearest != null
+                ? level.damageSources().indirectMagic(nearest, nearest)
+                : level.damageSources().magic();
             for (Mob mob : level.getEntitiesOfClass(Mob.class, area, m -> m instanceof Enemy)) {
-                mob.hurt(level.damageSources().magic(), damage);
+                mob.hurt(src, damage);
             }
         }
     }
