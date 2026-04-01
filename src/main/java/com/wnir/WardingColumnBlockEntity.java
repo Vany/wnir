@@ -2,6 +2,7 @@ package com.wnir;
 
 import java.util.Map;
 import java.util.Set;
+import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import net.minecraft.core.BlockPos;
 import net.minecraft.resources.ResourceKey;
@@ -14,6 +15,8 @@ import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.block.entity.BlockEntityType;
 import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.level.storage.ValueInput;
+import net.minecraft.world.level.storage.ValueOutput;
 import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.Vec3;
 
@@ -56,6 +59,13 @@ public class WardingColumnBlockEntity extends BlockEntity {
     boolean hasInhibit      = false;
     int     hurtPostCount   = 0;
     boolean isBottomOfColumn = true;
+
+    /**
+     * UUID of the player who placed any block in this column.
+     * Used as the damage attribution for hurt post kills (loot drops).
+     * Null until a player places a block in the column.
+     */
+    UUID installerUUID = null;
 
     private int tickCounter;
 
@@ -128,10 +138,12 @@ public class WardingColumnBlockEntity extends BlockEntity {
 
         if (be.hurtPostCount > 0) {
             float damage = HURT_DAMAGE * be.hurtPostCount;
-            // indirectMagic bypasses armor and attributes kills to the player so mobs drop full loot.
-            Player nearest = level.getNearestPlayer(pos.getX() + 0.5, pos.getY() + 0.5, pos.getZ() + 0.5, be.totalRadius, false);
-            DamageSource src = nearest != null
-                ? level.damageSources().indirectMagic(nearest, nearest)
+            // indirectMagic bypasses armor and attributes kills to the installer so mobs drop full loot.
+            Player installer = be.installerUUID != null
+                ? ((ServerLevel) level).getServer().getPlayerList().getPlayer(be.installerUUID)
+                : null;
+            DamageSource src = installer != null
+                ? level.damageSources().indirectMagic(installer, installer)
                 : level.damageSources().magic();
             for (Mob mob : level.getEntitiesOfClass(Mob.class, area, m -> m instanceof Enemy)) {
                 mob.hurt(src, damage);
@@ -173,7 +185,39 @@ public class WardingColumnBlockEntity extends BlockEntity {
         hasRepel      = repelCount > 0;
         hasInhibit    = inhibitCount > 0;
         hurtPostCount = hurtCount;
+
+        // Collect installer UUID from any BE in the column (bottom BE owns the result).
+        UUID[] found = {installerUUID};
+        ColumnHelper.forEachInColumn(level, worldPosition, WardingColumnBlock.class,
+            WardingColumnBlockEntity.class, columnBe -> {
+                if (found[0] == null && columnBe.installerUUID != null) {
+                    found[0] = columnBe.installerUUID;
+                }
+            });
+        installerUUID = found[0];
+
         updateRegistry();
+    }
+
+    /** Called from WardingColumnBaseBlock.setPlacedBy when a player places any column block. */
+    void setInstaller(UUID uuid) {
+        this.installerUUID = uuid;
+        setChanged();
+    }
+
+    // ── Persistence ───────────────────────────────────────────────────────
+
+    @Override
+    protected void loadAdditional(ValueInput input) {
+        super.loadAdditional(input);
+        String raw = input.getStringOr("installer", "");
+        installerUUID = raw.isEmpty() ? null : UUID.fromString(raw);
+    }
+
+    @Override
+    protected void saveAdditional(ValueOutput output) {
+        super.saveAdditional(output);
+        if (installerUUID != null) output.putString("installer", installerUUID.toString());
     }
 
     // ── Lifecycle ─────────────────────────────────────────────────────────

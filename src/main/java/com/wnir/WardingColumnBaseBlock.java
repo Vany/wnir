@@ -3,7 +3,9 @@ package com.wnir;
 import java.util.function.Supplier;
 import net.minecraft.core.BlockPos;
 import net.minecraft.util.RandomSource;
+import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.BlockGetter;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.BaseEntityBlock;
@@ -73,6 +75,16 @@ public abstract class WardingColumnBaseBlock extends BaseEntityBlock implements 
     }
 
     // ── Events ───────────────────────────────────────────────────────────
+
+    @Override
+    public void setPlacedBy(Level level, BlockPos pos, BlockState state, LivingEntity placer, ItemStack stack) {
+        super.setPlacedBy(level, pos, state, placer, stack);
+        if (!level.isClientSide() && placer instanceof Player player) {
+            if (level.getBlockEntity(pos) instanceof WardingColumnBlockEntity be) {
+                be.setInstaller(player.getUUID());
+            }
+        }
+    }
 
     @Override
     protected void onPlace(
