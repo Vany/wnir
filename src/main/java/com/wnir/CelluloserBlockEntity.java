@@ -184,7 +184,14 @@ public class CelluloserBlockEntity extends BlockEntity implements Container, net
 
     @Override
     public boolean canPlaceItem(int slot, ItemStack stack) {
-        return stack.is(Items.ENCHANTED_BOOK);
+        return isEnchanted(stack);
+    }
+
+    static boolean isEnchanted(ItemStack stack) {
+        var enc = stack.get(DataComponents.ENCHANTMENTS);
+        if (enc != null && !enc.isEmpty()) return true;
+        var stored = stack.get(DataComponents.STORED_ENCHANTMENTS);
+        return stored != null && !stored.isEmpty();
     }
 
     // ── MenuProvider ─────────────────────────────────────────────────────────
@@ -204,11 +211,11 @@ public class CelluloserBlockEntity extends BlockEntity implements Container, net
     public static void serverTick(Level level, BlockPos pos, BlockState state, CelluloserBlockEntity be) {
         boolean changed = false;
 
-        // Consume book → calculate total XP
+        // Consume enchanted item → calculate total XP
         if (be.remainingXp == 0) {
-            ItemStack book = be.items.get(0);
-            if (!book.isEmpty() && book.is(Items.ENCHANTED_BOOK)) {
-                int xp = calcBookXp(book);
+            ItemStack input = be.items.get(0);
+            if (!input.isEmpty() && isEnchanted(input)) {
+                int xp = calcItemXp(input);
                 if (xp > 0) {
                     be.items.set(0, ItemStack.EMPTY);
                     be.remainingXp = xp;
@@ -257,17 +264,21 @@ public class CelluloserBlockEntity extends BlockEntity implements Container, net
     // ── XP calculation ───────────────────────────────────────────────────────
 
     /**
-     * Sum of XP points needed to reach the enchanting-table minimum level for each
-     * enchantment on the book, using Minecraft's level→XP-point formula.
+     * Sum of XP for all enchantments on the item.
+     * Reads STORED_ENCHANTMENTS (books) and ENCHANTMENTS (gear) — whichever is present.
      */
-    static int calcBookXp(ItemStack book) {
-        ItemEnchantments stored = book.getOrDefault(DataComponents.STORED_ENCHANTMENTS, ItemEnchantments.EMPTY);
+    static int calcItemXp(ItemStack stack) {
         int total = 0;
-        for (var entry : stored.entrySet()) {
-            var ench = entry.getKey().value();
-            int lvl = entry.getValue();
-            int meanLevel = (ench.getMinCost(lvl) + ench.getMaxCost(lvl)) / 2;
-            total += levelToXp(meanLevel);
+        for (var enc : new ItemEnchantments[]{
+            stack.getOrDefault(DataComponents.ENCHANTMENTS, ItemEnchantments.EMPTY),
+            stack.getOrDefault(DataComponents.STORED_ENCHANTMENTS, ItemEnchantments.EMPTY),
+        }) {
+            for (var entry : enc.entrySet()) {
+                var ench = entry.getKey().value();
+                int lvl = entry.getValue();
+                int meanLevel = (ench.getMinCost(lvl) + ench.getMaxCost(lvl)) / 2;
+                total += levelToXp(meanLevel);
+            }
         }
         return total;
     }

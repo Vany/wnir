@@ -1,0 +1,9 @@
+{
+  "variants": {
+    "facing=down":  { "model": "wnir:block/steel_hopper" },
+    "facing=east":  { "model": "wnir:block/steel_hopper_side", "y": 90 },
+    "facing=north": { "model": "wnir:block/steel_hopper_side" },
+    "facing=south": { "model": "wnir:block/steel_hopper_side", "y": 180 },
+    "facing=west":  { "model": "wnir:block/steel_hopper_side", "y": 270 }
+  }
+}

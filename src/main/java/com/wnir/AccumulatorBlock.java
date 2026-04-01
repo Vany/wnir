@@ -49,10 +49,13 @@ public class AccumulatorBlock extends BaseEntityBlock {
         BlockEntity be = level.getBlockEntity(pos);
         if (be instanceof AccumulatorBlockEntity abe && !level.isClientSide()) {
             ItemStack stack = new ItemStack(this);
-            CompoundTag tag = abe.saveCustomOnly(level.registryAccess());
-            if (!tag.isEmpty()) {
-                stack.set(DataComponents.BLOCK_ENTITY_DATA, TypedEntityData.of(abe.getType(), tag));
-            }
+            // Build tag with CompoundTag.putLong directly — must match AccumulatorCombineRecipe
+            // format so CompoundTag.getLong reads correctly in WnirBlockItem.accumulatorDataLines.
+            // saveCustomOnly uses ValueOutput which is not readable by CompoundTag.getLong.
+            CompoundTag tag = new CompoundTag();
+            tag.putLong("capacity", abe.getCapacity());
+            tag.putLong("energy", abe.getEnergy());
+            stack.set(DataComponents.BLOCK_ENTITY_DATA, TypedEntityData.of(abe.getType(), tag));
             ItemEntity entity = new ItemEntity(level,
                 pos.getX() + 0.5, pos.getY() + 0.5, pos.getZ() + 0.5, stack);
             entity.setDefaultPickUpDelay();

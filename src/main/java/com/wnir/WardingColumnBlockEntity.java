@@ -7,6 +7,7 @@ import net.minecraft.core.BlockPos;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.entity.Mob;
+import net.minecraft.world.entity.monster.Enemy;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.block.entity.BlockEntityType;
@@ -25,6 +26,8 @@ import net.minecraft.world.phys.Vec3;
  *   - WardingPostBlock:         +6 (radius only)
  *   - RepellingPostBlock:       +4 (radius + mob push)
  *   - TeleporterInhibitorBlock: +4 (radius + teleport block)
+ *   - HurtPostBlock:            +4 (radius + 1-heart armor-bypassing damage every 4 ticks)
+ *   - LightingPostBlock:        +4 (radius + light level 15)
  */
 public class WardingColumnBlockEntity extends BlockEntity {
 
@@ -40,11 +43,16 @@ public class WardingColumnBlockEntity extends BlockEntity {
     static final double REPELLING_RADIUS = 4.0;
     /** Contribution per TeleporterInhibitorBlock in column. */
     static final double INHIBITOR_RADIUS = 4.0;
+    /** Contribution per HurtPostBlock in column. */
+    static final double HURT_RADIUS = 4.0;
+    /** Damage per tick cycle: 2.0 = 1 heart, bypasses armor via magic damage source. */
+    private static final float HURT_DAMAGE = 2.0f;
 
     // ── Column state (valid only when isBottomOfColumn) ──────────────────
     double totalRadius      = 6.0;  // default: single warding post = 6
     boolean hasRepel        = false;
     boolean hasInhibit      = false;
+    int     hurtPostCount   = 0;
     boolean isBottomOfColumn = true;
 
     private int tickCounter;
@@ -94,7 +102,7 @@ public class WardingColumnBlockEntity extends BlockEntity {
         WardingColumnBlockEntity be
     ) {
         if (!be.isBottomOfColumn) return;
-        if (!be.hasRepel) return;
+        if (!be.hasRepel && be.hurtPostCount == 0) return;
         if (++be.tickCounter < TICK_INTERVAL) return;
         be.tickCounter = 0;
 
@@ -105,13 +113,22 @@ public class WardingColumnBlockEntity extends BlockEntity {
             center.x + radius, center.y + VERTICAL_RANGE, center.z + radius
         );
 
-        for (Mob mob : level.getEntitiesOfClass(Mob.class, area, Mob::isAggressive)) {
-            Vec3 dir = mob.position().subtract(center);
-            double dist = dir.horizontalDistance();
-            if (dist < CENTER_EPSILON) { dir = new Vec3(1, 0, 0); dist = 1; }
-            double scale = PUSH_STRENGTH / dist;
-            mob.push(dir.x * scale, PUSH_UPWARD, dir.z * scale);
-            mob.hurtMarked = true;
+        if (be.hasRepel) {
+            for (Mob mob : level.getEntitiesOfClass(Mob.class, area, Mob::isAggressive)) {
+                Vec3 dir = mob.position().subtract(center);
+                double dist = dir.horizontalDistance();
+                if (dist < CENTER_EPSILON) { dir = new Vec3(1, 0, 0); dist = 1; }
+                double scale = PUSH_STRENGTH / dist;
+                mob.push(dir.x * scale, PUSH_UPWARD, dir.z * scale);
+                mob.hurtMarked = true;
+            }
+        }
+
+        if (be.hurtPostCount > 0) {
+            float damage = HURT_DAMAGE * be.hurtPostCount;
+            for (Mob mob : level.getEntitiesOfClass(Mob.class, area, m -> m instanceof Enemy)) {
+                mob.hurt(level.damageSources().magic(), damage);
+            }
         }
     }
 
@@ -138,12 +155,17 @@ public class WardingColumnBlockEntity extends BlockEntity {
         int inhibitCount = ColumnHelper.countInColumn(
             level, worldPosition, exclude, WardingColumnBlock.class, TeleporterInhibitorBlock.class
         );
+        int hurtCount = ColumnHelper.countInColumn(
+            level, worldPosition, exclude, WardingColumnBlock.class, HurtPostBlock.class
+        );
 
         totalRadius = WARDING_RADIUS * wardingCount
                     + REPELLING_RADIUS * repelCount
-                    + INHIBITOR_RADIUS * inhibitCount;
-        hasRepel   = repelCount > 0;
-        hasInhibit = inhibitCount > 0;
+                    + INHIBITOR_RADIUS * inhibitCount
+                    + HURT_RADIUS * hurtCount;
+        hasRepel      = repelCount > 0;
+        hasInhibit    = inhibitCount > 0;
+        hurtPostCount = hurtCount;
         updateRegistry();
     }
 

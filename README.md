@@ -5,7 +5,9 @@
 
 # WNIR — When Nothing Is Ready
 
-A standalone NeoForge mod for Minecraft 1.21.11 that fills gaps in vanilla gameplay with custom blocks, mob effects, enchantments, and potions.
+A standalone NeoForge mod for Minecraft 1.21.11 that fills gaps in vanilla gameplay with custom blocks, mob effects, enchantments, potions, and utility items.
+
+All items and blocks show a one-sentence description in their tooltip. Hold **SHIFT** while hovering to expand into a full usage description.
 
 **Mod ID:** `wnir` | **Loader:** NeoForge 21.11.38-beta | **Java:** 21+
 
@@ -30,6 +32,8 @@ A standalone NeoForge mod for Minecraft 1.21.11 that fills gaps in vanilla gamep
   - [Magic Cellulose](#magic-cellulose)
 - [Items](#items)
   - [Blue Sticky Tape](#blue-sticky-tape)
+- [Recipes](#recipes)
+  - [Kelp Compression](#kelp-compression)
 - [Mob Effects](#mob-effects)
 - [Enchantments](#enchantments)
   - [Swift Strike](#swift-strike)

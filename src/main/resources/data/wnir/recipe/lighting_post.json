@@ -1,0 +1,17 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "category": "misc",
+  "pattern": [
+    " G ",
+    "GWG",
+    " G "
+  ],
+  "key": {
+    "G": "minecraft:glowstone_dust",
+    "W": "wnir:warding_post"
+  },
+  "result": {
+    "id": "wnir:lighting_post",
+    "count": 4
+  }
+}

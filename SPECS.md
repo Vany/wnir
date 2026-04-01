@@ -1,39 +1,7 @@
 # SPECS.md — When Nothing Is Ready (wnir)
 
-## TODO
-
-
-- [x] Chunk loader block
-- [x] Spawner agitator block
-- [x] Warding post block
-- [x] Teleporter inhibitor block
-- [x] Repelling post block
-- [x] EE Clock machine accelerator block
-- [x] Antiwither block
-- [x] Martial Lightning effect
-- [x] Homing Archery effect
-- [x] Insane Light effect
-- [x] Mega Chanter effect + anvil bypass
-- [x] Dead Blow effect
-- [x] Streamer Protect effect
-- [x] Swift Strike enchantment
-- [x] Accelerate enchantment
-- [x] Toughness enchantment
-- [x] Mega Chanter potion (Awkward + Book)
-- [x] Mossy Hopper block
-- [x] Personal Dimension Teleporter block + wnir:personal dimension
-- [x] EE Clock Budding Crystal block (budding amethyst + EE Clock column → grows → becomes EE Clock)
-- [x] Teleporter Crystal block (crying obsidian + EE Clock column → grows → becomes Personal Dimension Teleporter)
-- [x] Blue Sticky Tape item (picks up any block with full NBT; renders wrapped block face + blue cross)
-- [x] OverCrooking enchantment (hoe enchant; multiplies leaf drops except saplings/sticks)
-- [x] Skull Beehive turret block (GeckoLib idle animation wired; shooting animation TODO)
-- [x] Celluloser block (enchanted book + water + FE → magic cellulose fluid)
-- [x] Magic Cellulose fluid + bucket item
-- [x] Martial Lightning potion (Awkward + Golden Sword)
 - [~] Enchanted weapons in dungeon loot — REMOVED (loot modifier conditions broken in 1.21.11; enchants available at enchanting table only)
 - [~] Enchantment books in dungeon loot — REMOVED (same reason)
-- [x] EE Clock in End City loot
-- [x] Warding Post in dungeon loot
 
 ---
 
@@ -106,56 +74,53 @@ Column placed below vanilla mob spawners. Modifies all spawners above:
 
 ---
 
+### Warding Column System
+
+All post blocks share a single `WardingColumnBlockEntity`. The **bottom** block of the column owns the computed state and runs the tick. Each block type contributes differently:
+
+| Block | Radius | Extra effect |
+|-------|--------|--------------|
+| `warding_post` | +6 | Pushes aggressive mobs outward |
+| `repelling_post` | +4 | Adds radius only |
+| `teleporter_inhibitor` | +4 | Cancels teleports in radius |
+| `lighting_post` | +4 | Light level 15 (no active effect) |
+| `hurt_post` | +4 | Magic damage to enemies: `1♥ × hurtPostCount` every 4 ticks |
+
+All types mix freely in one column. Column events on every block type: `onPlace` → `notifyColumn`, `playerWillDestroy` → `notifyColumnExcluding`, `randomTick` → `notifyColumn`, `onLoad` (BE) → `recalcColumn`.
+
+**Tick:** bottom BE only. Every 4 ticks. Vertical range ±2.5 blocks. Push strength 0.5, upward 0.1.
+
+**Acquisition:** all posts are loot-only — jungle temples, desert pyramids, strongholds, mineshafts, simple dungeons. Weight 3 each.
+
+---
+
 ### Warding Post (`wnir:warding_post`)
 
-Column block that repels hostile mobs outward. Radius scales with column height.
-
-**Radius formula:** `radius = 4 * columnHeight` (1 post → 4 blocks, 2 → 8, etc.). Vertical range: ±2 blocks.
-
-**Behavior:**
-- Only topmost post in a column ticks (others skip via `isTopOfColumn`)
-- Ticks every 4 server ticks
-- Scans for `Monster` entities in an AABB; pushes each mob ~0.5 blocks outward + 0.1 upward
-- Mobs at exact center pushed in +X direction
-
-**Column events:**
-
-| Event | Action |
-|-------|--------|
-| `onPlace` | `notifyColumn()` — recalc all posts in column |
-| `playerWillDestroy` | `notifyColumnExcluding(removed)` |
-| `affectNeighborsAfterRemoval` | `notifyColumn(pos)` + `notifyColumn(pos.above())` |
-| `randomTick` | `notifyColumn()` — integrity recheck |
-| `onLoad` (BE) | `recalcColumn()` |
-
-**Acquisition:** no crafting recipe — found only in dungeon loot (jungle temples, desert pyramids, strongholds, mineshafts, simple dungeons).
+Pushes `isAggressive()` mobs outward. +6 radius per post.
 
 ---
 
 ### Teleporter Inhibitor (`wnir:teleporter_inhibitor`)
 
-Prevents entity teleportation within radius. Participates in mixed warding columns.
+Cancels teleports in radius. +4 radius per post. `EntityTeleportEvent` at `LOWEST` priority — skips player-issued `/tp` (`TeleportCommand`, `SpreadPlayersCommand`).
 
-**Radius formula:** `inhibitRadius = 4 * (wardingPostCount + inhibitorCount)`.
+---
 
-**Two modes:**
-- **Standalone:** inhibits teleports only. Top `TeleporterInhibitorBlockEntity` owns the radius.
-- **Mixed column with Warding Post:** warding posts handle mob repulsion at their own radius; inhibitor extends coverage. Top `WardingPostBlockEntity` owns both.
+### Lighting Post (`wnir:lighting_post`)
 
-**Event:** `EntityTeleportEvent` at `LOWEST` priority. Skips `TeleportCommand` and `SpreadPlayersCommand` (player-issued `/tp`).
+Light level 15. +4 radius. No active effect. Recipe: glowstone_dust × 4 + warding_post → 4.
 
-**Warding column system:**
-- `WardingColumnBlock` — marker interface for both types
-- `ColumnHelper` — `forEachInMixedColumn`, `countInMixedColumn`, `isTopOfMixedColumn`
-- `WardingPostTeleportHandler` — scans range, reads radius from top-of-column BE
+---
 
-**Acquisition:** no crafting recipe — loot-only (same dungeon sources as Warding Post).
+### Hurt Post (`wnir:hurt_post`)
+
+Deals magic damage (bypasses armor) to all `Enemy` implementors in column radius every 4 ticks. Damage scales with count: `2.0 × hurtPostCount` HP (i.e. 1♥ per post). +4 radius per post. Loot-only.
 
 ---
 
 ### Repelling Post (`wnir:repelling_post`)
 
-Column block. Currently uses the same base behavior as Warding Post. Distinct block for future differentiation.
+Adds +4 radius to the column. No active effect of its own.
 
 ---
 
@@ -194,6 +159,7 @@ Item sorter hopper. Extends `HopperBlock` / `RandomizableContainerBlockEntity`.
 - **Never ejects the last item in a stack** — only pushes from slots where `count > 1`
 - If only one eligible slot, both transfers come from it
 - Slot selection is random among eligible slots each transfer
+- Uses `Capabilities.Item.BLOCK` for ejection — works with vanilla and modded inventories
 
 **GUI:**
 - `MossyHopperMenu` — 10 hopper slots (rows at y=20 and y=38) + standard player inventory (y=64) + hotbar (y=122). `IMAGE_HEIGHT = 149`.
@@ -481,6 +447,14 @@ Contains: chunk_loader, spawner_agitator, warding_post, teleporter_inhibitor, re
 
 ---
 
+### Accumulator (`wnir:accumulator`)
+
+Passive FE buffer. Base capacity 1,000,000 FE. Retains charge when mined — dropped item carries full BE state (energy + capacity). Combine two or more in a crafting grid to merge their energy and capacity (custom recipe `AccumulatorCombineRecipe`).
+
+**Tooltip:** dynamic header line showing `n / m FE` — color-coded by fill level (green > 66%, yellow 33–66%, red < 33%). Uses K / M / G suffixes. Rendered via `WnirBlockItem` `headerLines` hook.
+
+---
+
 ### Celluloser (`wnir:celluloser`)
 
 Converts enchanted books + water + FE into magic cellulose fluid.
@@ -517,6 +491,40 @@ Converts enchanted books + water + FE into magic cellulose fluid.
 **Recipe:** shaped — `"EBE" / "SLS" / "GEG"` (E=emerald, B=brush, S=shears, L=lectern, G=gold_ingot).
 
 **Properties:** green map color, metal sound, strength 3.5, `requiresCorrectToolForDrops()`. State preserved on mine via `copy_components` on `block_entity_data`.
+
+---
+
+### Steel Hopper (`wnir:steel_hopper`)
+
+High-throughput version of the Mossy Hopper. Renders as iron.
+
+**Slots:** 10 (two rows of 5). GUI opens on right-click.
+
+**Transfer logic (every 8 ticks):**
+- Pull from above via `HopperBlockEntity.suckInItems()`
+- Push up to 8 items from a single slot per cycle (fills existing stacks first via `ResourceHandlerUtil.insertStacking`)
+- No slot-lock restriction (unlike Mossy Hopper — all slots eligible)
+- Uses `Capabilities.Item.BLOCK` for ejection — works with vanilla and modded inventories
+
+**GUI:** `SteelHopperMenu` + `SteelHopperScreen` — identical layout to Mossy Hopper.
+
+**Recipe:** shaped — `"I I" / "IHI" / " I "`, I = iron_ingot, H = hopper.
+
+---
+
+### Seed Bundle (`wnir:seed_bundle`)
+
+Green bundle that auto-plants seeds across adjacent farmland.
+
+**Capacity:** 9 distinct item stacks (max one stack per item type; up to maxStackSize items per slot). No weight limit.
+
+**Insertion:** Click inventory item onto bundle to insert (inherited from `BundleItem`). Left-click slot item to transfer in; right-click bundle to remove one.
+
+**Planting:** Right-click any surface → BFS flood-fill up to 64 blocks across same-level adjacent blocks. For each empty planting spot, tries each seed type in bundle using the seed's own `useOn()` — capability-based, not hardcoded to farmland. Plants one seed per position and removes it from the bundle.
+
+**Recipe:** shaped — `" S " / "SBS" / " S "`, S = wheat_seeds, B = green_bundle.
+
+**Model:** reuses vanilla `minecraft:item/green_bundle` models (with open-front/back in GUI when item selected).
 
 ---
 

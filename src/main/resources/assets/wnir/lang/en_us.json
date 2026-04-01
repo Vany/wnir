@@ -15,6 +15,10 @@
   "item.wnir.teleporter_inhibitor": "Teleporter Inhibitor",
   "block.wnir.repelling_post": "Repelling Post",
   "item.wnir.repelling_post": "Repelling Post",
+  "block.wnir.lighting_post": "Lighting Post",
+  "item.wnir.lighting_post": "Lighting Post",
+  "block.wnir.hurt_post": "Hurt Post",
+  "item.wnir.hurt_post": "Hurt Post",
   "block.wnir.antiwither": "Antiwither",
   "item.wnir.antiwither": "Antiwither",
   "itemGroup.wnir": "When Nothing Is Ready",
@@ -35,6 +39,9 @@
   "block.wnir.mossy_hopper": "Mossy Hopper",
   "item.wnir.mossy_hopper": "Mossy Hopper",
   "container.wnir.mossy_hopper": "Mossy Hopper",
+  "block.wnir.steel_hopper": "Steel Hopper",
+  "item.wnir.steel_hopper": "Steel Hopper",
+  "container.wnir.steel_hopper": "Steel Hopper",
   "block.wnir.personal_dimension_teleporter": "Personal Dimension Teleporter",
   "item.wnir.personal_dimension_teleporter": "Personal Dimension Teleporter",
   "block.wnir.personal_dimension_teleporter.no_access": "This portal is not attuned to you.",
@@ -51,11 +58,83 @@
   "container.wnir.skull_beehive": "Skull Beehive",
   "fluid_type.wnir.magic_cellulose": "Magic Cellulose",
   "item.wnir.magic_cellulose_bucket": "Magic Cellulose Bucket",
+  "block.wnir.magic_cellulose_block": "Magic Cellulose",
   "block.wnir.celluloser": "Celluloser",
   "item.wnir.celluloser": "Celluloser",
   "container.wnir.celluloser": "Celluloser",
   "item.wnir.mousey_compass": "Mousey Compass",
   "item.wnir.wireless_fuel": "Wireless Fuel",
   "block.wnir.accumulator": "Accumulator",
-  "item.wnir.accumulator": "Accumulator"
+  "item.wnir.accumulator": "Accumulator",
+
+  "tooltip.wnir.shift_for_more": "Hold SHIFT for more",
+
+  "tooltip.wnir.chunk_loader": "Force-loads the chunk it occupies.",
+  "tooltip.wnir.chunk_loader.detail": "Keeps the chunk loaded with no players nearby. Break to release.",
+
+  "tooltip.wnir.spawner_agitator": "Stacks below spawners to boost their speed and range.",
+  "tooltip.wnir.spawner_agitator.detail": "Each block in the column reduces spawner delay and expands its range.",
+
+  "tooltip.wnir.warding_post": "Pushes hostiles away. +6 radius per post.",
+  "tooltip.wnir.warding_post.detail": "Stack with other column posts. Loot only — no crafting recipe.",
+
+  "tooltip.wnir.teleporter_inhibitor": "Cancels teleports in range. +4 radius per post.",
+  "tooltip.wnir.teleporter_inhibitor.detail": "Affects ender pearls, chorus fruit, and all teleports. Loot only.",
+
+  "tooltip.wnir.repelling_post": "Adds radius to a warding column. +4 per post.",
+  "tooltip.wnir.repelling_post.detail": "No effect on its own — mix with Warding Post. Loot only.",
+  "tooltip.wnir.lighting_post": "Light level 15. +4 radius per post.",
+  "tooltip.wnir.lighting_post.detail": "Brightest possible light in a slender post shape. Loot only.",
+  "tooltip.wnir.hurt_post": "Deals 1 heart per post to nearby hostiles. Bypasses armor.",
+  "tooltip.wnir.hurt_post.detail": "Magic damage every 4 ticks to all enemies in column radius. Stacks: 2 posts = 2 hearts, etc. Loot only.",
+
+  "tooltip.wnir.antiwither": "Immune to all explosions. Nearly indestructible.",
+  "tooltip.wnir.antiwither.detail": "Hardness 50, blast resistance 3,600,000. Requires a pickaxe.",
+
+  "tooltip.wnir.ee_clock": "Adds extra ticks to the machine above. Stack for more speed.",
+  "tooltip.wnir.ee_clock.detail": "N clocks = N extra ticks per game tick for the machine directly above or below the column.",
+
+  "tooltip.wnir.ee_clock_budding_crystal": "Grows into an EE Clock over time.",
+  "tooltip.wnir.ee_clock_budding_crystal.detail": "Place on an EE Clock column. ~1 Minecraft week per clock in the column. Right-click to check progress.",
+
+  "tooltip.wnir.mossy_hopper": "10-slot hopper that never empties a slot below 1 item.",
+  "tooltip.wnir.mossy_hopper.detail": "Transfers 2 items per 8 ticks. Right-click to open.",
+  "tooltip.wnir.steel_hopper": "10-slot hopper that transfers 8 items per cycle.",
+  "tooltip.wnir.steel_hopper.detail": "High-throughput hopper. No slot-lock restriction. Right-click to open.",
+
+  "tooltip.wnir.personal_dimension_teleporter": "Teleports you to your personal dimension.",
+  "tooltip.wnir.personal_dimension_teleporter.detail": "Requires full hunger. Costs 20 hunger. Place a player skull on top to restrict to owner.",
+
+  "tooltip.wnir.teleporter_crystal": "Grows into a Personal Dimension Teleporter.",
+  "tooltip.wnir.teleporter_crystal.detail": "Place on an EE Clock column. Feed 16 ender pearls by right-clicking. Right-click to check progress.",
+
+  "tooltip.wnir.skull_beehive": "Automated turret. Fires arrows at hostile mobs.",
+  "tooltip.wnir.skull_beehive.detail": "136-slot inventory: weapons and arrows. Right-click to open. Sneak+right-click to pick up with contents.",
+
+  "tooltip.wnir.accumulator": "Passive FE buffer. Base capacity: 1,000,000 FE.",
+  "tooltip.wnir.accumulator.detail": "Retains charge when mined. Combine multiple in a crafting grid to merge capacity and energy.",
+
+  "tooltip.wnir.celluloser": "Converts enchanted books + water + FE → Magic Cellulose.",
+  "tooltip.wnir.celluloser.detail": "One book fills the 16-bucket output tank. Right-click to open.",
+
+  "item.wnir.seed_bundle": "Seed Bundle",
+  "item.wnir.professional_seed_bundle": "Professional Seed Bundle",
+
+  "tooltip.wnir.seed_bundle": "Holds 9 stacks of seeds. Right-click a surface to mass-plant.",
+  "tooltip.wnir.seed_bundle.detail": "Accepts crops, stems, and nether wart. Flood-fills up to 64 adjacent blocks and plants seeds using each seed's own planting logic.",
+
+  "tooltip.wnir.professional_seed_bundle": "Holds seeds and harvests mature crops. Right-click to plant or harvest.",
+  "tooltip.wnir.professional_seed_bundle.detail": "Right-click farmland to mass-plant seeds (same as Seed Bundle). Right-click a fully grown crop to flood-fill all connected farmland, harvest every mature crop, reset it to age 0, and drop the yield at your feet.",
+
+  "tooltip.wnir.blue_sticky_tape": "Picks up any block with its full NBT state.",
+  "tooltip.wnir.blue_sticky_tape.detail": "Right-click to lift a block. Right-click a surface to place. Consumed on placement.",
+
+  "tooltip.wnir.mousey_compass": "Finds a block type by spiraling outward from you.",
+  "tooltip.wnir.mousey_compass.detail": "Hold target block in offhand, right-click to search. Right-click again to cancel.",
+
+  "tooltip.wnir.wireless_fuel": "Draws FE from a linked block to fuel furnaces.",
+  "tooltip.wnir.wireless_fuel.detail": "Shift+right-click an energy block to link. 4,000 FE per burn cycle. Never consumed.",
+
+  "tooltip.wnir.magic_cellulose_bucket": "Magic Cellulose fluid from the Celluloser.",
+  "tooltip.wnir.magic_cellulose_bucket.detail": "Pour into the world or use in recipes. Empty bucket returned."
 }

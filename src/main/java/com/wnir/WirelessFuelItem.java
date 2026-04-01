@@ -117,34 +117,15 @@ public final class WirelessFuelItem extends Item {
     public int getBurnTime(ItemStack stack, @Nullable RecipeType<?> recipeType, FuelValues fuelValues) {
         CompoundTag tag = getOrCreate(stack);
         if (tag.getInt(KEY_STATE).orElse(STATE_NO_LINK) == STATE_NO_LINK) return 0;
-
         String dimStr = tag.getString(KEY_DIM).orElse("");
         if (dimStr.isEmpty()) return 0;
-
-        MinecraftServer server = ServerLifecycleHooks.getCurrentServer();
-        if (server == null) return 0;  // client side — no side effects
-
-        // Buffer is filled by onPlayerTick — no transaction here (getBurnTime may be
-        // called inside another mod's open transaction, which would crash on openRoot).
-        // Do NOT set STATE_ERROR here: an empty buffer just means onPlayerTick hasn't
-        // filled it yet. Error state is owned exclusively by onPlayerTick.
+        // Pure query — no side effects. getBurnTime is called for slot validation
+        // (isValidFuel) as well as for actual burning; deducting here causes phantom
+        // drain when the item is placed into an empty furnace that never ignites.
+        // The actual deduction happens in getCraftingRemainder, which is called
+        // exactly once per burn cycle when the furnace truly consumes the item.
         long buffer = tag.getLong(KEY_BUF).orElse(0L);
-
-        if (buffer >= FUEL_PER_USE) {
-            ResourceKey<Level> dim = ResourceKey.create(
-                Registries.DIMENSION, Identifier.parse(dimStr));
-            ServerLevel linkedLevel = server.getLevel(dim);
-            if (linkedLevel == null) return 0;
-
-            buffer -= FUEL_PER_USE;
-            tag.putLong(KEY_BUF, buffer);
-            tag.putInt(KEY_STATE, STATE_ACTIVE);
-            tag.putLong(KEY_ASINCE, linkedLevel.getGameTime());
-            save(stack, tag);
-            setModelState(stack, STATE_ACTIVE);
-            return BURN_TIME;
-        }
-        return 0;
+        return buffer >= FUEL_PER_USE ? BURN_TIME : 0;
     }
 
     private static void markError(ItemStack stack, CompoundTag tag) {
@@ -159,6 +140,22 @@ public final class WirelessFuelItem extends Item {
     public ItemStack getCraftingRemainder(ItemStack stack) {
         ItemStack copy = stack.copy();
         copy.setCount(1);
+        // Deduct fuel cost here — called exactly once per burn cycle when the furnace
+        // actually replaces the consumed item with its remainder. Never called during
+        // slot validation, so this is the correct place for the side effect.
+        CompoundTag tag = getOrCreate(copy);
+        long buffer = tag.getLong(KEY_BUF).orElse(0L);
+        if (buffer >= FUEL_PER_USE) {
+            buffer -= FUEL_PER_USE;
+            tag.putLong(KEY_BUF, buffer);
+            MinecraftServer server = ServerLifecycleHooks.getCurrentServer();
+            if (server != null) {
+                tag.putInt(KEY_STATE, STATE_ACTIVE);
+                tag.putLong(KEY_ASINCE, server.overworld().getGameTime());
+            }
+            save(copy, tag);
+            setModelState(copy, STATE_ACTIVE);
+        }
         return copy;
     }
 
@@ -190,6 +187,11 @@ public final class WirelessFuelItem extends Item {
         Consumer<Component> consumer,
         TooltipFlag flag
     ) {
+        WnirTooltips.add(consumer, flag,
+            Component.translatable("tooltip.wnir.wireless_fuel"),
+            Component.translatable("tooltip.wnir.wireless_fuel.detail"));
+        consumer.accept(Component.empty());
+
         CompoundTag tag = getOrCreate(stack);
         int state = tag.getInt(KEY_STATE).orElse(STATE_NO_LINK);
         long buffer = tag.getLong(KEY_BUF).orElse(0L);
@@ -421,15 +423,10 @@ public final class WirelessFuelItem extends Item {
             }
         }
 
-        // If buffer is now enough, consume and report burn time
+        // Report burn time if buffer is sufficient. No deduction here —
+        // getCraftingRemainder deducts when the furnace actually consumes the item.
         buffer = tag.getLong(KEY_BUF).orElse(0L);
         if (buffer >= FUEL_PER_USE) {
-            buffer -= FUEL_PER_USE;
-            tag.putLong(KEY_BUF, buffer);
-            tag.putInt(KEY_STATE, STATE_ACTIVE);
-            tag.putLong(KEY_ASINCE, now);
-            save(stack, tag);
-            setModelState(stack, STATE_ACTIVE);
             event.setBurnTime(BURN_TIME);
         }
     }

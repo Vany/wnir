@@ -142,8 +142,13 @@ public final class MouseyCompassItem extends Item {
         Consumer<Component> consumer,
         TooltipFlag flag
     ) {
+        WnirTooltips.add(consumer, flag,
+            Component.translatable("tooltip.wnir.mousey_compass"),
+            Component.translatable("tooltip.wnir.mousey_compass.detail"));
+
         Identifier targetId = getTargetId(stack);
         if (targetId == null) return;
+        consumer.accept(Component.empty());
 
         Block block = BuiltInRegistries.BLOCK.getValue(targetId);
         consumer.accept(Component.literal("Target: ").append(block.getName()));

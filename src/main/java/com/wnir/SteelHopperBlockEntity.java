@@ -23,25 +23,25 @@ import net.neoforged.neoforge.transfer.item.ItemResource;
 import net.neoforged.neoforge.transfer.transaction.Transaction;
 
 /**
- * Mossy Hopper block entity.
+ * Steel Hopper block entity.
  *
  * Inventory: 10 slots (two rows of 5).
- * Transfer: every 8 ticks, eject 1 item from each of 2 randomly chosen eligible slots
- *           (slots with count > 1). If only 1 eligible slot exists, both transfers come
- *           from it (provided count is still > 1 after the first).
- *           Never ejects the last item — a slot with count=1 is ineligible for ejection.
+ * Transfer: every 8 ticks, eject up to 8 items to the output container.
+ * Vanilla behavior — no "never empty slot" restriction.
  */
-public class MossyHopperBlockEntity extends RandomizableContainerBlockEntity implements Hopper {
+public class SteelHopperBlockEntity extends RandomizableContainerBlockEntity implements Hopper {
 
     private static final int SIZE     = 10;
     private static final int COOLDOWN = 8;
+    /** Items to transfer per cycle (vs vanilla 1, mossy 2). */
+    private static final int TRANSFER_PER_CYCLE = 8;
 
     private NonNullList<ItemStack> items = NonNullList.withSize(SIZE, ItemStack.EMPTY);
     private int cooldownTime = -1;
     private Direction facing;
 
-    MossyHopperBlockEntity(BlockPos pos, BlockState state) {
-        super(WnirRegistries.MOSSY_HOPPER_BE.get(), pos, state);
+    SteelHopperBlockEntity(BlockPos pos, BlockState state) {
+        super(WnirRegistries.STEEL_HOPPER_BE.get(), pos, state);
         this.facing = state.getValue(HopperBlock.FACING);
     }
 
@@ -76,17 +76,17 @@ public class MossyHopperBlockEntity extends RandomizableContainerBlockEntity imp
 
     @Override
     protected Component getDefaultName() {
-        return Component.translatable("container.wnir.mossy_hopper");
+        return Component.translatable("container.wnir.steel_hopper");
     }
 
     @Override
     protected AbstractContainerMenu createMenu(int id, Inventory playerInv) {
-        return new MossyHopperMenu(id, playerInv, this);
+        return new SteelHopperMenu(id, playerInv, this);
     }
 
     // ── Tick ──────────────────────────────────────────────────────────────
 
-    public static void serverTick(Level level, BlockPos pos, BlockState state, MossyHopperBlockEntity be) {
+    public static void serverTick(Level level, BlockPos pos, BlockState state, SteelHopperBlockEntity be) {
         be.cooldownTime--;
         if (be.cooldownTime > 0) return;
         be.cooldownTime = 0;
@@ -95,7 +95,7 @@ public class MossyHopperBlockEntity extends RandomizableContainerBlockEntity imp
 
         boolean moved = false;
 
-        // Eject: up to 2 items from eligible (count > 1) slots to the attached container.
+        // Eject: up to TRANSFER_PER_CYCLE items to the attached container.
         // Use IItemHandler capability so modded inventories (e.g. Sophisticated Storage) work.
         if (!be.isEmpty()) {
             ResourceHandler<ItemResource> dest = level.getCapability(
@@ -103,10 +103,10 @@ public class MossyHopperBlockEntity extends RandomizableContainerBlockEntity imp
                 pos.relative(be.facing),
                 be.facing.getOpposite()
             );
-            if (dest != null) moved = ejectTwoItems(level, be, dest);
+            if (dest != null) moved = ejectItems(be, dest);
         }
 
-        // Suck: pull 1 item from container above (or item entities).
+        // Suck: pull items from container above (or item entities).
         if (!be.inventoryFull()) {
             moved |= HopperBlockEntity.suckInItems(level, be);
         }
@@ -118,36 +118,28 @@ public class MossyHopperBlockEntity extends RandomizableContainerBlockEntity imp
     }
 
     /**
-     * Transfers up to 2 items from eligible slots (count > 1) to {@code dest}.
-     * Re-evaluates eligibility before each transfer so a slot reduced to count=1
-     * isn't transferred again.
+     * Transfers up to TRANSFER_PER_CYCLE items from this hopper to {@code dest}.
+     * Uses IItemHandler so both vanilla and modded inventories are supported.
      */
-    private static boolean ejectTwoItems(Level level, MossyHopperBlockEntity be, ResourceHandler<ItemResource> dest) {
+    private static boolean ejectItems(SteelHopperBlockEntity be, ResourceHandler<ItemResource> dest) {
         boolean moved = false;
+        int transferred = 0;
 
-        for (int transfer = 0; transfer < 2; transfer++) {
-            // Re-collect eligible slots each pass so counts are current.
-            int eligibleCount = 0;
-            for (ItemStack s : be.items) if (s.getCount() > 1) eligibleCount++;
-            if (eligibleCount == 0) break;
+        for (int slot = 0; slot < SIZE && transferred < TRANSFER_PER_CYCLE; slot++) {
+            ItemStack stack = be.items.get(slot);
+            if (stack.isEmpty()) continue;
 
-            // Pick a random eligible slot.
-            int pick = level.random.nextInt(eligibleCount);
-            int slot = -1;
-            for (int i = 0; i < SIZE; i++) {
-                if (be.items.get(i).getCount() > 1 && pick-- == 0) { slot = i; break; }
-            }
-            if (slot < 0) break;
-
-            ItemResource resource = ItemResource.of(be.items.get(slot));
+            int amount = Math.min(stack.getCount(), TRANSFER_PER_CYCLE - transferred);
+            ItemResource resource = ItemResource.of(stack);
             try (var tx = Transaction.openRoot()) {
-                int inserted = ResourceHandlerUtil.insertStacking(dest, resource, 1, tx);
+                int inserted = ResourceHandlerUtil.insertStacking(dest, resource, amount, tx);
                 if (inserted > 0) {
                     tx.commit();
                     be.removeItem(slot, inserted);
                     moved = true;
+                    transferred += inserted;
                 } else {
-                    break; // destination full
+                    break; // destination full — no point trying further slots
                 }
             }
         }

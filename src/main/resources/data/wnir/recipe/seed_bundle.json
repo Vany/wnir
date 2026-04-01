@@ -1,0 +1,17 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "category": "misc",
+  "pattern": [
+    "SSS",
+    "SBS",
+    "SSS"
+  ],
+  "key": {
+    "S": "minecraft:stick",
+    "B": "minecraft:green_bundle"
+  },
+  "result": {
+    "id": "wnir:seed_bundle",
+    "count": 1
+  }
+}

@@ -9,7 +9,6 @@ import net.minecraft.world.inventory.ContainerData;
 import net.minecraft.world.inventory.SimpleContainerData;
 import net.minecraft.world.inventory.Slot;
 import net.minecraft.world.item.ItemStack;
-import net.minecraft.world.item.Items;
 
 /**
  * Celluloser container menu.
@@ -50,10 +49,10 @@ public class CelluloserMenu extends AbstractContainerMenu {
 
         checkContainerSize(container, 1);
 
-        // Book input slot — only enchanted books allowed
+        // Input slot — any enchanted item allowed
         addSlot(new Slot(container, 0, 80, 36) {
             @Override public boolean mayPlace(ItemStack stack) {
-                return stack.is(Items.ENCHANTED_BOOK);
+                return CelluloserBlockEntity.isEnchanted(stack);
             }
         });
 
@@ -97,8 +96,8 @@ public class CelluloserMenu extends AbstractContainerMenu {
             if (!moveItemStackTo(stack, PLAYER_INV_START, HOTBAR_END, true)) return ItemStack.EMPTY;
             slot.onQuickCraft(stack, result);
         } else {
-            // Player inventory → book slot (enchanted books only)
-            if (stack.is(Items.ENCHANTED_BOOK)) {
+            // Player inventory → input slot (any enchanted item)
+            if (CelluloserBlockEntity.isEnchanted(stack)) {
                 if (!moveItemStackTo(stack, BOOK_SLOT, PLAYER_INV_START, false)) return ItemStack.EMPTY;
             } else if (index < PLAYER_INV_END) {
                 // Inventory row → hotbar

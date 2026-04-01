@@ -27,6 +27,16 @@ public class WnirMod {
                 (be, side) -> VanillaContainerWrapper.of(be)
             );
             event.registerBlockEntity(
+                Capabilities.Item.BLOCK,
+                WnirRegistries.STEEL_HOPPER_BE.get(),
+                (be, side) -> VanillaContainerWrapper.of(be)
+            );
+            event.registerBlockEntity(
+                Capabilities.Item.BLOCK,
+                WnirRegistries.MOSSY_HOPPER_BE.get(),
+                (be, side) -> VanillaContainerWrapper.of(be)
+            );
+            event.registerBlockEntity(
                 Capabilities.Energy.BLOCK,
                 WnirRegistries.CELLULOSER_BE.get(),
                 (be, side) -> be.energyHandler

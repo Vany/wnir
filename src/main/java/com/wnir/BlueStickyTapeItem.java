@@ -75,8 +75,13 @@ public class BlueStickyTapeItem extends Item {
         Consumer<Component> consumer,
         TooltipFlag flag
     ) {
+        WnirTooltips.add(consumer, flag,
+            Component.translatable("tooltip.wnir.blue_sticky_tape"),
+            Component.translatable("tooltip.wnir.blue_sticky_tape.detail"));
+
         CompoundTag beTag = getStoredBeTag(stack);
         if (beTag == null) return;
+        consumer.accept(Component.empty());
 
         // Container contents (chest, furnace, hopper, etc.)
         // Items are saved as: {"Slot": N, "id": "...", "count": N}
@@ -155,7 +160,17 @@ public class BlueStickyTapeItem extends Item {
         tag.put("block_state", NbtUtils.writeBlockState(state));
 
         BlockEntity be = level.getBlockEntity(pos);
-        if (be != null) tag.put("block_entity", be.saveWithoutMetadata(level.registryAccess()));
+        if (be != null) {
+            CompoundTag beTag = be.saveWithoutMetadata(level.registryAccess());
+            // Trial spawner: "data.current_mobs" holds UUIDs of mobs spawned at the original
+            // location. They are only valid there — leaving them in causes the spawner to wait
+            // indefinitely for mobs that will never be found at the new position. Clear them so
+            // the spawner starts a fresh wave immediately when placed.
+            if (be instanceof net.minecraft.world.level.block.entity.TrialSpawnerBlockEntity) {
+                beTag.getCompound("data").ifPresent(data -> data.remove("current_mobs"));
+            }
+            tag.put("block_entity", beTag);
+        }
 
         CustomData.set(DataComponents.CUSTOM_DATA, stack, tag);
         stack.set(DataComponents.CUSTOM_MODEL_DATA, new CustomModelData(List.of(1.0f), List.of(), List.of(), List.of()));

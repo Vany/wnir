@@ -54,6 +54,7 @@ public class WnirClientSetup {
     @SubscribeEvent
     public static void onRegisterMenuScreens(RegisterMenuScreensEvent event) {
         event.register(WnirRegistries.MOSSY_HOPPER_MENU.get(), MossyHopperScreen::new);
+        event.register(WnirRegistries.STEEL_HOPPER_MENU.get(), SteelHopperScreen::new);
         event.register(WnirRegistries.EE_CLOCK_BUDDING_CRYSTAL_MENU.get(), EEClockBuddingCrystalScreen::new);
         event.register(WnirRegistries.TELEPORTER_CRYSTAL_MENU.get(), TeleporterCrystalScreen::new);
         event.register(WnirRegistries.SKULL_BEEHIVE_MENU.get(), SkullBeehiveScreen::new);

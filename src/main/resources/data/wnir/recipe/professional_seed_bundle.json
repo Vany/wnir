@@ -1,0 +1,17 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "category": "misc",
+  "pattern": [
+    "GGG",
+    "GSG",
+    "GGG"
+  ],
+  "key": {
+    "G": "minecraft:gold_nugget",
+    "S": "wnir:seed_bundle"
+  },
+  "result": {
+    "id": "wnir:professional_seed_bundle",
+    "count": 1
+  }
+}

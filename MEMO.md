@@ -35,6 +35,7 @@ Deploy: `make build`, then copy jar from `build/libs/` to test instance.
 | ValueInput int | `input.getIntOr("key", defaultValue)` (not `getInt().orElse()`) |
 | ContainerHelper | `ContainerHelper.loadAllItems(ValueInput, list)` / `saveAllItems(ValueOutput, list)` |
 | Block breaking tool | `requiresCorrectToolForDrops()` only gates drops; add block to `data/minecraft/tags/block/mineable/pickaxe.json` for actual pickaxe speed/breakability |
+| `SlotAccess` | `net.minecraft.world.entity.SlotAccess` (NOT `world.inventory`) |
 | `@EventBusSubscriber` | `.bus()` parameter ignored in NeoForge FML 4 — omit it; routing is automatic via `IModBusEvent` |
 | `Level.isClientSide` | Private field — use `level.isClientSide()` method |
 | MapCodec covariant | Subclass of HopperBlock: `(MapCodec<HopperBlock>)(MapCodec<?>) SUBTYPE_CODEC` + `@SuppressWarnings("unchecked")` |
@@ -56,6 +57,33 @@ Deploy: `make build`, then copy jar from `build/libs/` to test instance.
 - **AccelerateHandler** — scales arrow velocity on `EntityJoinLevelEvent`.
 - **HomingArcheryHandler** — cancels arrow, spawns `ShulkerBullet`; tracks damage via `ConcurrentHashMap<UUID, TrackedBullet>` (stale entries cleaned after 60s).
 - **InsaneLightHandler** — 2× mob `FOLLOW_RANGE` via `ADD_MULTIPLIED_BASE + 1.0`; refreshed every 40 ticks.
+
+## NeoForge Item Transfer API (1.21.11)
+
+`Capabilities.ItemHandler` does NOT exist in the runtime jar — it is the old deprecated API. Use:
+
+| Goal | API |
+|------|-----|
+| Get item handler from block | `level.getCapability(Capabilities.Item.BLOCK, pos, direction)` → `ResourceHandler<ItemResource>` |
+| Convert ItemStack to resource | `ItemResource.of(stack)` |
+| Insert (stacking, fills existing first) | `ResourceHandlerUtil.insertStacking(handler, resource, amount, tx)` → inserted count |
+| Transaction | `try (var tx = Transaction.openRoot()) { ...; tx.commit(); }` — auto-aborts on close if not committed |
+| Expose own inventory | Register in `RegisterCapabilitiesEvent`: `event.registerBlockEntity(Capabilities.Item.BLOCK, beType, (be, side) -> VanillaContainerWrapper.of(be))` |
+
+**Critical:** `RandomizableContainerBlockEntity` does NOT auto-expose `Capabilities.Item.BLOCK`. Must register explicitly in `WnirMod` or modded inventories (and other wnir hoppers) can't see it.
+
+## WnirBlockItem Tooltip System
+
+`WnirBlockItem(block, props, name, headerLines, dataLines)`
+
+| Field | Shown | Purpose |
+|-------|-------|---------|
+| `headerLines` | Always, before description | Dynamic state (e.g. energy level) |
+| description (`tooltip.wnir.<name>`) | Always | One-liner via `WnirTooltips.add()` |
+| detail (`tooltip.wnir.<name>.detail`) | Shift only | Usage notes |
+| `dataLines` | Always, after description | Extra persistent data |
+
+`formatFe(long)` — shared helper, K/M/G suffixes at 1k/1M/1G. Color pattern for fill level: `GREEN > 66%`, `YELLOW 33–66%`, `RED < 33%`.
 
 ## New Blocks/Items Added
 
@@ -144,7 +172,10 @@ public void render(GuiGraphics g, int mouseX, int mouseY, float partialTick) {
 - **GeckoLib wired** — `SkullBeehiveBlockEntity` implements `GeoBlockEntity`; `SkullBeehiveGeoModel` defined. Idle animation loops. Shooting animation not yet defined. `GeoBlockRenderer` registered in `WnirClientSetup` (raw-type cast required — see GeckoLib notes).
 - **Sneak+right-click** — picks up block into player inventory (or drops at feet if full), preserving all NBT via `collectComponents()`.
 
+- **LightingPostBlock** — warding column block, light level 15. No BE logic; reuses `WardingColumnBlockEntity`. Participates in mixed column height. Recipe: glowstone_dust × 4 + warding_post → 4. Dungeon loot weight 3.
+
 ## Known Limitations / Issues
 
 - Spawner placed *after* agitator is only detected on chunk reload (`onLoad`). `neighborChanged` takes `Orientation` in 1.21.11 — not currently overridden to watch for new spawners.
-- Repelling Post currently has no unique behavior beyond Warding Post base.
+- Repelling Post has no active effect — adds +4 radius only. Intentional placeholder.
+- **GUI PNG bit depth:** Minecraft silently rejects 16-bit PNGs (shows missing/default texture). All GUI textures must be 8-bit RGBA. Convert with Pillow: `img.convert('RGBA').save(path, bits=8)`.

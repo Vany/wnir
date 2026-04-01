@@ -15,6 +15,7 @@ import net.minecraft.world.effect.MobEffectInstance;
 import net.minecraft.world.item.BlockItem;
 import net.minecraft.world.item.CreativeModeTab;
 import net.minecraft.world.item.Item;
+import net.minecraft.world.item.component.BundleContents;
 import net.minecraft.world.item.component.LodestoneTracker;
 import net.minecraft.core.component.DataComponents;
 import net.minecraft.world.item.alchemy.Potion;
@@ -111,9 +112,9 @@ public final class WnirRegistries {
                 .setId(ResourceKey.create(Registries.BLOCK, id("magic_cellulose_block")))
         ));
 
-    public static final Supplier<BucketItem> MAGIC_CELLULOSE_BUCKET =
+    public static final Supplier<MagicCelluloseBucketItem> MAGIC_CELLULOSE_BUCKET =
         ITEMS.register("magic_cellulose_bucket", () ->
-            new BucketItem(MAGIC_CELLULOSE_STILL.get(),
+            new MagicCelluloseBucketItem(MAGIC_CELLULOSE_STILL.get(),
                 new Item.Properties()
                     .craftRemainder(Items.BUCKET)
                     .stacksTo(1)
@@ -161,6 +162,9 @@ public final class WnirRegistries {
     public static final Supplier<net.minecraft.world.item.crafting.CustomRecipe.Serializer<AccumulatorCombineRecipe>> ACCUMULATOR_COMBINE_RECIPE =
         RECIPE_SERIALIZERS.register("accumulator_combine", () -> AccumulatorCombineRecipe.SERIALIZER);
 
+    public static final Supplier<net.minecraft.world.item.crafting.CustomRecipe.Serializer<KelpCompressionRecipe>> KELP_COMPRESSION_RECIPE =
+        RECIPE_SERIALIZERS.register("kelp_compression", () -> KelpCompressionRecipe.SERIALIZER);
+
     @SuppressWarnings("unchecked")
     private static final DeferredRegister<MenuType<?>> MENU_TYPES =
         DeferredRegister.create(
@@ -184,7 +188,7 @@ public final class WnirRegistries {
         BlockEntityType.BlockEntitySupplier<E> entityFactory,
         BlockBehaviour.Properties props
     ) {
-        return registerBlock(name, blockFactory, entityFactory, props, BlockItem::new);
+        return registerBlock(name, blockFactory, entityFactory, props, (b, p) -> new WnirBlockItem(b, p, name));
     }
 
     private static <B extends Block, E extends BlockEntity> BlockBundle<B, E> registerBlock(
@@ -219,7 +223,7 @@ public final class WnirRegistries {
 
         Supplier<B> block = BLOCKS.register(name, () -> blockFactory.apply(props.setId(blockKey)));
         Supplier<BlockItem> item = ITEMS.register(name, () ->
-            new BlockItem(block.get(), new Item.Properties().setId(itemKey))
+            new WnirBlockItem(block.get(), new Item.Properties().setId(itemKey), name)
         );
         return new SimpleBlockBundle<>(block, item);
     }
@@ -246,10 +250,33 @@ public final class WnirRegistries {
         registerSimpleBlock("repelling_post", RepellingPostBlock::new,
             BlockBehaviour.Properties.of().mapColor(MapColor.COLOR_ORANGE).sound(SoundType.BONE_BLOCK).strength(0.1f).noOcclusion().randomTicks());
 
+    private static final SimpleBlockBundle<LightingPostBlock> LIGHTING_POST =
+        registerSimpleBlock("lighting_post", LightingPostBlock::new,
+            BlockBehaviour.Properties.of()
+                .mapColor(MapColor.COLOR_YELLOW)
+                .sound(SoundType.GLASS)
+                .strength(0.3f)
+                .noOcclusion()
+                .randomTicks()
+                .lightLevel(s -> 15));
+
+    private static final SimpleBlockBundle<HurtPostBlock> HURT_POST =
+        registerSimpleBlock("hurt_post", HurtPostBlock::new,
+            BlockBehaviour.Properties.of()
+                .mapColor(MapColor.COLOR_RED)
+                .sound(SoundType.BONE_BLOCK)
+                .strength(0.1f)
+                .noOcclusion()
+                .randomTicks());
+
     /** Single shared BE type for all warding column blocks. */
     private static final Supplier<BlockEntityType<WardingColumnBlockEntity>> WARDING_COLUMN_BE =
         BLOCK_ENTITIES.register("warding_column", () -> {
-            Set<Block> blocks = Set.of(WARDING_POST.block.get(), TELEPORTER_INHIBITOR.block.get(), REPELLING_POST.block.get());
+            Set<Block> blocks = Set.of(
+                WARDING_POST.block.get(), TELEPORTER_INHIBITOR.block.get(),
+                REPELLING_POST.block.get(), LIGHTING_POST.block.get(),
+                HURT_POST.block.get()
+            );
             return new BlockEntityType<>(WardingColumnBlockEntity::create, blocks);
         });
 
@@ -305,7 +332,7 @@ public final class WnirRegistries {
                 .sound(SoundType.WOOD)
                 .strength(2.0f)
                 .requiresCorrectToolForDrops(),
-            BlockItem::new);
+            (b, p) -> new WnirBlockItem(b, p, "skull_beehive"));
 
     private static final BlockBundle<AccumulatorBlock, AccumulatorBlockEntity> ACCUMULATOR =
         registerBlock("accumulator", AccumulatorBlock::new, AccumulatorBlockEntity::new,
@@ -313,7 +340,17 @@ public final class WnirRegistries {
                 .mapColor(MapColor.COLOR_ORANGE)
                 .sound(SoundType.METAL)
                 .strength(3.5f)
-                .requiresCorrectToolForDrops());
+                .requiresCorrectToolForDrops(),
+            (b, p) -> new WnirBlockItem(b, p, "accumulator", WnirBlockItem::accumulatorHeaderLines, null));
+
+    private static final BlockBundle<SteelHopperBlock, SteelHopperBlockEntity> STEEL_HOPPER =
+        registerBlock("steel_hopper", SteelHopperBlock::new, SteelHopperBlockEntity::new,
+            BlockBehaviour.Properties.of()
+                .mapColor(MapColor.METAL)
+                .requiresCorrectToolForDrops()
+                .strength(3.0f)
+                .sound(SoundType.METAL)
+                .noOcclusion());
 
     private static final BlockBundle<CelluloserBlock, CelluloserBlockEntity> CELLULOSER =
         registerBlock("celluloser", CelluloserBlock::new, CelluloserBlockEntity::new,
@@ -321,9 +358,30 @@ public final class WnirRegistries {
                 .mapColor(MapColor.COLOR_GREEN)
                 .sound(SoundType.METAL)
                 .strength(3.5f)
-                .requiresCorrectToolForDrops());
+                .requiresCorrectToolForDrops(),
+            (b, p) -> new WnirBlockItem(b, p, "celluloser", WnirBlockItem::celluloserDataLines));
 
     // ── Standalone items ─────────────────────────────────────────────────
+
+    public static final Supplier<SeedBundleItem> SEED_BUNDLE_ITEM =
+        ITEMS.register("seed_bundle", () ->
+            new SeedBundleItem(
+                new Item.Properties()
+                    .stacksTo(1)
+                    .component(DataComponents.BUNDLE_CONTENTS, BundleContents.EMPTY)
+                    .setId(ResourceKey.create(Registries.ITEM, id("seed_bundle")))
+            )
+        );
+
+    public static final Supplier<ProfessionalSeedBundleItem> PROFESSIONAL_SEED_BUNDLE_ITEM =
+        ITEMS.register("professional_seed_bundle", () ->
+            new ProfessionalSeedBundleItem(
+                new Item.Properties()
+                    .stacksTo(1)
+                    .component(DataComponents.BUNDLE_CONTENTS, BundleContents.EMPTY)
+                    .setId(ResourceKey.create(Registries.ITEM, id("professional_seed_bundle")))
+            )
+        );
 
     public static final Supplier<BlueStickyTapeItem> BLUE_STICKY_TAPE_ITEM =
         ITEMS.register("blue_sticky_tape", () ->
@@ -359,6 +417,9 @@ public final class WnirRegistries {
     public static final Supplier<MenuType<MossyHopperMenu>> MOSSY_HOPPER_MENU =
         MENU_TYPES.register("mossy_hopper", () -> new MenuType<>(MossyHopperMenu::new, FeatureFlags.VANILLA_SET));
 
+    public static final Supplier<MenuType<SteelHopperMenu>> STEEL_HOPPER_MENU =
+        MENU_TYPES.register("steel_hopper", () -> new MenuType<>(SteelHopperMenu::new, FeatureFlags.VANILLA_SET));
+
     public static final Supplier<MenuType<EEClockBuddingCrystalMenu>> EE_CLOCK_BUDDING_CRYSTAL_MENU =
         MENU_TYPES.register("ee_clock_budding_crystal", () -> new MenuType<>(EEClockBuddingCrystalMenu::new, FeatureFlags.VANILLA_SET));
 
@@ -373,6 +434,9 @@ public final class WnirRegistries {
 
     public static final Supplier<BlockEntityType<MossyHopperBlockEntity>> MOSSY_HOPPER_BE = MOSSY_HOPPER.entity;
     public static final Supplier<BlockItem> MOSSY_HOPPER_ITEM = MOSSY_HOPPER.item;
+
+    public static final Supplier<BlockEntityType<SteelHopperBlockEntity>> STEEL_HOPPER_BE = STEEL_HOPPER.entity;
+    public static final Supplier<BlockItem> STEEL_HOPPER_ITEM = STEEL_HOPPER.item;
 
     public static final Supplier<BlockEntityType<SpawnerAgitatorBlockEntity>> SPAWNER_AGITATOR_BE = SPAWNER_AGITATOR.entity;
     public static final Supplier<BlockEntityType<WardingColumnBlockEntity>> WARDING_COLUMN_BLOCK_ENTITY = WARDING_COLUMN_BE;
@@ -400,6 +464,8 @@ public final class WnirRegistries {
     public static final Supplier<BlockItem> WARDING_POST_ITEM = WARDING_POST.item;
     public static final Supplier<BlockItem> TELEPORTER_INHIBITOR_ITEM = TELEPORTER_INHIBITOR.item;
     public static final Supplier<BlockItem> REPELLING_POST_ITEM = REPELLING_POST.item;
+    public static final Supplier<BlockItem> LIGHTING_POST_ITEM = LIGHTING_POST.item;
+    public static final Supplier<BlockItem> HURT_POST_ITEM = HURT_POST.item;
     public static final Supplier<BlockItem> ANTI_WITHER_ITEM = ANTI_WITHER.item;
     public static final Supplier<BlockItem> EE_CLOCK_ITEM = EE_CLOCK.item;
     public static final Supplier<BlockItem> EE_CLOCK_BUDDING_CRYSTAL_ITEM = EE_CLOCK_BUDDING_CRYSTAL.item;
@@ -420,13 +486,18 @@ public final class WnirRegistries {
                     output.accept(WARDING_POST_ITEM.get());
                     output.accept(TELEPORTER_INHIBITOR_ITEM.get());
                     output.accept(REPELLING_POST_ITEM.get());
+                    output.accept(LIGHTING_POST_ITEM.get());
+                    output.accept(HURT_POST_ITEM.get());
                     output.accept(ANTI_WITHER_ITEM.get());
                     output.accept(EE_CLOCK_ITEM.get());
                     output.accept(EE_CLOCK_BUDDING_CRYSTAL_ITEM.get());
                     output.accept(TELEPORTER_CRYSTAL_ITEM.get());
                     output.accept(MOSSY_HOPPER_ITEM.get());
+                    output.accept(STEEL_HOPPER_ITEM.get());
                     output.accept(PERSONAL_DIMENSION_TELEPORTER_ITEM.get());
                     output.accept(BLUE_STICKY_TAPE_ITEM.get());
+                    output.accept(SEED_BUNDLE_ITEM.get());
+                    output.accept(PROFESSIONAL_SEED_BUNDLE_ITEM.get());
                     output.accept(MOUSEY_COMPASS_ITEM.get());
                     output.accept(WIRELESS_FUEL_ITEM.get());
                     output.accept(SKULL_BEEHIVE_ITEM.get());
