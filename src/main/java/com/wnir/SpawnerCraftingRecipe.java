@@ -1,5 +1,7 @@
 package com.wnir;
 
+import java.util.List;
+import java.util.Optional;
 import net.minecraft.core.HolderLookup;
 import net.minecraft.core.component.DataComponents;
 import net.minecraft.nbt.CompoundTag;
@@ -9,6 +11,8 @@ import net.minecraft.world.item.component.CustomData;
 import net.minecraft.world.item.crafting.CraftingBookCategory;
 import net.minecraft.world.item.crafting.CraftingInput;
 import net.minecraft.world.item.crafting.CustomRecipe;
+import net.minecraft.world.item.crafting.Ingredient;
+import net.minecraft.world.item.crafting.PlacementInfo;
 import net.minecraft.world.item.crafting.RecipeSerializer;
 import net.minecraft.world.level.Level;
 
@@ -37,6 +41,27 @@ public class SpawnerCraftingRecipe extends CustomRecipe {
     @Override
     public RecipeSerializer<? extends CustomRecipe> getSerializer() {
         return WnirRegistries.SPAWNER_CRAFTING_RECIPE.get();
+    }
+
+    /** Return false so JEI and the recipe book include this recipe. */
+    @Override
+    public boolean isSpecial() { return false; }
+
+    /**
+     * Describe the 3×3 grid for JEI and the recipe book.
+     * The tape slot shows blue sticky tape; players must wrap a spawner inside it.
+     */
+    @Override
+    public PlacementInfo placementInfo() {
+        Ingredient iron = Ingredient.of(Items.IRON_BARS);
+        Ingredient bucket = Ingredient.of(Items.BUCKET);
+        Ingredient tape = Ingredient.of(WnirRegistries.BLUE_STICKY_TAPE_ITEM.get());
+        Ingredient accum = Ingredient.of(WnirRegistries.ACCUMULATOR_BLOCK.get().asItem());
+        return PlacementInfo.createFromOptionals(List.of(
+            Optional.of(iron),   Optional.of(bucket), Optional.of(iron),
+            Optional.of(iron),   Optional.of(tape),   Optional.of(iron),
+            Optional.of(iron),   Optional.of(accum),  Optional.of(iron)
+        ));
     }
 
     @Override
