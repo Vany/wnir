@@ -190,7 +190,8 @@ public class SpawnerBlockEntity extends BlockEntity {
             if (be.currentTarget == null) return;
         }
 
-        // Pause if not enough fluid
+        // Pause on redstone signal or insufficient fluid
+        if (level.hasNeighborSignal(pos)) return;
         if (be.fluidHandler.getAmountAsLong(0) < FLUID_PER_TICK) return;
 
         // Drain fluid
