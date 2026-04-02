@@ -165,6 +165,9 @@ public final class WnirRegistries {
     public static final Supplier<net.minecraft.world.item.crafting.CustomRecipe.Serializer<KelpCompressionRecipe>> KELP_COMPRESSION_RECIPE =
         RECIPE_SERIALIZERS.register("kelp_compression", () -> KelpCompressionRecipe.SERIALIZER);
 
+    public static final Supplier<net.minecraft.world.item.crafting.CustomRecipe.Serializer<SpawnerCraftingRecipe>> SPAWNER_CRAFTING_RECIPE =
+        RECIPE_SERIALIZERS.register("spawner_crafting", () -> SpawnerCraftingRecipe.SERIALIZER);
+
     @SuppressWarnings("unchecked")
     private static final DeferredRegister<MenuType<?>> MENU_TYPES =
         DeferredRegister.create(
