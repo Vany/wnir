@@ -51,6 +51,11 @@ public class WnirMod {
                 WnirRegistries.CELLULOSER_BE.get(),
                 (be, side) -> be.fluidHandler
             );
+            event.registerBlockEntity(
+                Capabilities.Fluid.BLOCK,
+                WnirRegistries.SPAWNER_BE.get(),
+                (be, side) -> be.fluidHandler
+            );
         });
 
         NeoForge.EVENT_BUS.addListener(MartialLightningHandler::onLivingIncomingDamage);

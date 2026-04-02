@@ -117,6 +117,11 @@
   "tooltip.wnir.celluloser": "Converts enchanted books + water + FE → Magic Cellulose.",
   "tooltip.wnir.celluloser.detail": "One book fills the 16-bucket output tank. Right-click to open.",
 
+  "block.wnir.spawner": "Spawner",
+  "item.wnir.spawner": "Spawner",
+  "tooltip.wnir.spawner": "Consumes Magic Cellulose to spawn hostile mobs from the local biome.",
+  "tooltip.wnir.spawner.detail": "Scans biome on placement. Weighted random mob selection. Each mob costs its XP value. 10 mB/tick drained, 5 XP/tick accumulated. Spawned mobs drop loot credited to the installer.",
+
   "item.wnir.seed_bundle": "Seed Bundle",
   "item.wnir.professional_seed_bundle": "Professional Seed Bundle",
 

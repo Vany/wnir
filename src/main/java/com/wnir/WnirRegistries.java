@@ -352,6 +352,14 @@ public final class WnirRegistries {
                 .sound(SoundType.METAL)
                 .noOcclusion());
 
+    private static final BlockBundle<SpawnerBlock, SpawnerBlockEntity> SPAWNER =
+        registerBlock("spawner", SpawnerBlock::new, SpawnerBlockEntity::new,
+            BlockBehaviour.Properties.of()
+                .mapColor(MapColor.COLOR_GRAY)
+                .sound(SoundType.METAL)
+                .strength(3.5f)
+                .requiresCorrectToolForDrops());
+
     private static final BlockBundle<CelluloserBlock, CelluloserBlockEntity> CELLULOSER =
         registerBlock("celluloser", CelluloserBlock::new, CelluloserBlockEntity::new,
             BlockBehaviour.Properties.of()
@@ -452,6 +460,9 @@ public final class WnirRegistries {
     public static final Supplier<SkullBeehiveBlock> SKULL_BEEHIVE_BLOCK = SKULL_BEEHIVE.block;
     public static final Supplier<BlockItem> SKULL_BEEHIVE_ITEM = SKULL_BEEHIVE.item;
 
+    public static final Supplier<BlockEntityType<SpawnerBlockEntity>> SPAWNER_BE = SPAWNER.entity;
+    public static final Supplier<BlockItem> SPAWNER_ITEM = SPAWNER.item;
+
     public static final Supplier<BlockEntityType<CelluloserBlockEntity>> CELLULOSER_BE = CELLULOSER.entity;
     public static final Supplier<BlockItem> CELLULOSER_ITEM = CELLULOSER.item;
 
@@ -504,6 +515,7 @@ public final class WnirRegistries {
                     output.accept(MAGIC_CELLULOSE_BUCKET.get());
                     output.accept(CELLULOSER_ITEM.get());
                     output.accept(ACCUMULATOR_ITEM.get());
+                    output.accept(SPAWNER_ITEM.get());
                 })
                 .build()
         );

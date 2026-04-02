@@ -13,6 +13,7 @@
     "wnir:ee_clock_budding_crystal",
     "wnir:teleporter_crystal",
     "wnir:celluloser",
-    "wnir:accumulator"
+    "wnir:accumulator",
+    "wnir:spawner"
   ]
 }
