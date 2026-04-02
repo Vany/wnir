@@ -39,9 +39,11 @@ import net.neoforged.neoforge.transfer.transaction.Transaction;
  */
 public class SpawnerBlockEntity extends BlockEntity {
 
-    static final int TANK_CAPACITY  = 16_000;
-    static final int FLUID_PER_TICK = 10;
-    static final int XP_PER_TICK    = 5;
+    static final int TANK_CAPACITY        = 16_000;
+    static final int FLUID_PER_TICK       = 10;
+    static final int XP_PER_TICK          = 5;
+    /** Multiplier on mob XP cost so a 5-XP mob takes 20 ticks ≈ 1 second. */
+    static final int SPAWN_COST_MULTIPLIER = 20;
 
     // ── Fluid ────────────────────────────────────────────────────────────────
 
@@ -165,7 +167,7 @@ public class SpawnerBlockEntity extends BlockEntity {
 
     private void setTarget(SpawnCandidate c) {
         currentTarget = c.type();
-        targetXp      = Math.max(1, c.xp());
+        targetXp      = Math.max(1, c.xp()) * SPAWN_COST_MULTIPLIER;
         accumulatedXp = 0;
         setChanged();
     }
