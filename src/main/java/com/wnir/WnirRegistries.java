@@ -360,7 +360,7 @@ public final class WnirRegistries {
             BlockBehaviour.Properties.of()
                 .mapColor(MapColor.COLOR_GRAY)
                 .sound(SoundType.METAL)
-                .strength(3.5f)
+                .strength(3.5f, 1200f)
                 .requiresCorrectToolForDrops());
 
     private static final BlockBundle<CelluloserBlock, CelluloserBlockEntity> CELLULOSER =
