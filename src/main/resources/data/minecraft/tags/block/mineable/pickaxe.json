@@ -15,6 +15,7 @@
     "wnir:celluloser",
     "wnir:accumulator",
     "wnir:spawner",
-    "wnir:silencer_post"
+    "wnir:silencer_post",
+    "wnir:reshaper_post"
   ]
 }

@@ -54,6 +54,10 @@ public class WardingColumnBlockEntity extends BlockEntity {
     private static final float HURT_DAMAGE = 2.0f;
     /** Contribution per SilencerPostBlock in column. */
     static final double SILENCER_RADIUS = 4.0;
+    /** Horizontal radius reduction per ReshaperPostBlock. */
+    static final double RESHAPER_RADIUS_REDUCTION = 2.0;
+    /** Vertical range bonus (up AND down) per ReshaperPostBlock. */
+    static final double RESHAPER_VERTICAL_BONUS = 1.0;
 
     // ── Column state (valid only when isBottomOfColumn) ──────────────────
     double totalRadius      = 6.0;  // default: single warding post = 6
@@ -61,6 +65,9 @@ public class WardingColumnBlockEntity extends BlockEntity {
     boolean hasInhibit      = false;
     int     hurtPostCount   = 0;
     int     silencerCount   = 0;
+    int     reshaperCount   = 0;
+    /** Extra vertical reach (both up and down) contributed by reshaper posts. */
+    double  extraVertical   = 0.0;
     boolean isBottomOfColumn = true;
 
     /**
@@ -142,10 +149,11 @@ public class WardingColumnBlockEntity extends BlockEntity {
         be.tickCounter = 0;
 
         double radius = be.totalRadius + 0.5;
+        double vertRange = VERTICAL_RANGE + be.extraVertical;
         Vec3 center = Vec3.atCenterOf(pos);
         AABB area = new AABB(
-            center.x - radius, center.y - VERTICAL_RANGE, center.z - radius,
-            center.x + radius, center.y + VERTICAL_RANGE, center.z + radius
+            center.x - radius, center.y - vertRange, center.z - radius,
+            center.x + radius, center.y + vertRange, center.z + radius
         );
 
         if (be.hasRepel) {
@@ -203,16 +211,23 @@ public class WardingColumnBlockEntity extends BlockEntity {
         int silencerCount = ColumnHelper.countInColumn(
             level, worldPosition, exclude, WardingColumnBlock.class, SilencerPostBlock.class
         );
+        int reshaperCount = ColumnHelper.countInColumn(
+            level, worldPosition, exclude, WardingColumnBlock.class, ReshaperPostBlock.class
+        );
 
-        totalRadius = WARDING_RADIUS * wardingCount
-                    + REPELLING_RADIUS * repelCount
-                    + INHIBITOR_RADIUS * inhibitCount
-                    + HURT_RADIUS * hurtCount
-                    + SILENCER_RADIUS * silencerCount;
+        double rawRadius = WARDING_RADIUS * wardingCount
+                         + REPELLING_RADIUS * repelCount
+                         + INHIBITOR_RADIUS * inhibitCount
+                         + HURT_RADIUS * hurtCount
+                         + SILENCER_RADIUS * silencerCount
+                         - RESHAPER_RADIUS_REDUCTION * reshaperCount;
+        totalRadius        = Math.max(1.0, rawRadius);
         hasRepel           = repelCount > 0;
         hasInhibit         = inhibitCount > 0;
         hurtPostCount      = hurtCount;
         this.silencerCount = silencerCount;
+        this.reshaperCount = reshaperCount;
+        extraVertical      = RESHAPER_VERTICAL_BONUS * reshaperCount;
 
         // Collect installer UUID from any BE in the column (bottom BE owns the result).
         UUID[] found = {installerUUID};

@@ -21,6 +21,8 @@
   "item.wnir.hurt_post": "Hurt Post",
   "block.wnir.silencer_post": "Silencer Post",
   "item.wnir.silencer_post": "Silencer Post",
+  "block.wnir.reshaper_post": "Reshaper Post",
+  "item.wnir.reshaper_post": "Reshaper Post",
   "block.wnir.antiwither": "Antiwither",
   "item.wnir.antiwither": "Antiwither",
   "itemGroup.wnir": "When Nothing Is Ready",
@@ -91,6 +93,8 @@
   "tooltip.wnir.hurt_post.detail": "Magic damage every 4 ticks to all enemies in column radius. Stacks: 2 posts = 2 hearts, etc. Loot only.",
   "tooltip.wnir.silencer_post": "Silences entity sounds by 90% within column radius. +4 radius per post.",
   "tooltip.wnir.silencer_post.detail": "Client-side attenuation. Affects mob sounds, ambient, etc. Stack posts for larger area. Loot only.",
+  "tooltip.wnir.reshaper_post": "Trades horizontal reach for vertical. −2 radius, +1 up/down per post.",
+  "tooltip.wnir.reshaper_post.detail": "Stack with other column posts. Minimum radius clamped to 1. Loot only.",
 
   "tooltip.wnir.antiwither": "Immune to all explosions. Nearly indestructible.",
   "tooltip.wnir.antiwither.detail": "Hardness 50, blast resistance 3,600,000. Requires a pickaxe.",
