@@ -76,6 +76,10 @@ public class WnirMod {
         NeoForge.EVENT_BUS.addListener(
             EventPriority.LOWEST, WardingPostTeleportHandler::onEntityTeleport
         );
+        // Client-only: register sound handler via FMLClientSetupEvent to avoid loading client classes on server
+        modEventBus.addListener((net.neoforged.fml.event.lifecycle.FMLClientSetupEvent e) -> {
+            NeoForge.EVENT_BUS.addListener(SilencerHandler::onPlaySound);
+        });
         NeoForge.EVENT_BUS.addListener(
             (net.neoforged.neoforge.event.level.BlockEvent.EntityPlaceEvent e) -> {
                 if (!(e.getLevel() instanceof net.minecraft.server.level.ServerLevel level)) return;

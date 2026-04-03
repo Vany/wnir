@@ -14,6 +14,7 @@
     "wnir:teleporter_crystal",
     "wnir:celluloser",
     "wnir:accumulator",
-    "wnir:spawner"
+    "wnir:spawner",
+    "wnir:silencer_post"
   ]
 }

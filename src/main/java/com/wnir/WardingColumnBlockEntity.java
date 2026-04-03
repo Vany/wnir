@@ -52,12 +52,15 @@ public class WardingColumnBlockEntity extends BlockEntity {
     static final double HURT_RADIUS = 4.0;
     /** Damage per tick cycle: 2.0 = 1 heart, bypasses armor via magic damage source. */
     private static final float HURT_DAMAGE = 2.0f;
+    /** Contribution per SilencerPostBlock in column. */
+    static final double SILENCER_RADIUS = 4.0;
 
     // ── Column state (valid only when isBottomOfColumn) ──────────────────
     double totalRadius      = 6.0;  // default: single warding post = 6
     boolean hasRepel        = false;
     boolean hasInhibit      = false;
     int     hurtPostCount   = 0;
+    int     silencerCount   = 0;
     boolean isBottomOfColumn = true;
 
     /**
@@ -90,19 +93,39 @@ public class WardingColumnBlockEntity extends BlockEntity {
         new ConcurrentHashMap<>();
 
     private void updateRegistry() {
-        if (level == null || level.isClientSide()) return;
-        ResourceKey<Level> key = ((ServerLevel) level).dimension();
-        Set<BlockPos> set = inhibitorRegistry.computeIfAbsent(key, k -> ConcurrentHashMap.newKeySet());
-        if (isBottomOfColumn && hasInhibit) {
-            set.add(worldPosition.immutable());
+        if (level == null) return;
+        ResourceKey<Level> key = level.dimension();
+
+        // inhibitorRegistry: server-side only (used by server-side teleport handler)
+        if (!level.isClientSide()) {
+            Set<BlockPos> inhibSet = inhibitorRegistry.computeIfAbsent(key, k -> ConcurrentHashMap.newKeySet());
+            if (isBottomOfColumn && hasInhibit) {
+                inhibSet.add(worldPosition.immutable());
+            } else {
+                inhibSet.remove(worldPosition);
+            }
+        }
+
+        // silencerRegistry: both sides (used by client-side sound handler)
+        Set<BlockPos> silSet = silencerRegistry.computeIfAbsent(key, k -> ConcurrentHashMap.newKeySet());
+        if (isBottomOfColumn && silencerCount > 0) {
+            silSet.add(worldPosition.immutable());
         } else {
-            set.remove(worldPosition);
+            silSet.remove(worldPosition);
         }
     }
+
+    /**
+     * Bottom-of-column positions with silencerCount>0, keyed by dimension.
+     * Populated on BOTH client and server so SilencerHandler can check it client-side.
+     */
+    static final Map<ResourceKey<Level>, Set<BlockPos>> silencerRegistry =
+        new ConcurrentHashMap<>();
 
     /** Called from WnirMod.onServerStopping() to clear all registry entries. */
     public static void clearRegistry() {
         inhibitorRegistry.clear();
+        silencerRegistry.clear();
     }
 
     // ── Tick ─────────────────────────────────────────────────────────────
@@ -177,14 +200,19 @@ public class WardingColumnBlockEntity extends BlockEntity {
         int hurtCount = ColumnHelper.countInColumn(
             level, worldPosition, exclude, WardingColumnBlock.class, HurtPostBlock.class
         );
+        int silencerCount = ColumnHelper.countInColumn(
+            level, worldPosition, exclude, WardingColumnBlock.class, SilencerPostBlock.class
+        );
 
         totalRadius = WARDING_RADIUS * wardingCount
                     + REPELLING_RADIUS * repelCount
                     + INHIBITOR_RADIUS * inhibitCount
-                    + HURT_RADIUS * hurtCount;
-        hasRepel      = repelCount > 0;
-        hasInhibit    = inhibitCount > 0;
-        hurtPostCount = hurtCount;
+                    + HURT_RADIUS * hurtCount
+                    + SILENCER_RADIUS * silencerCount;
+        hasRepel           = repelCount > 0;
+        hasInhibit         = inhibitCount > 0;
+        hurtPostCount      = hurtCount;
+        this.silencerCount = silencerCount;
 
         // Collect installer UUID from any BE in the column (bottom BE owns the result).
         UUID[] found = {installerUUID};
@@ -230,11 +258,15 @@ public class WardingColumnBlockEntity extends BlockEntity {
 
     @Override
     public void setRemoved() {
-        // Safe: only removes from a static Set, no world access.
-        if (level != null && !level.isClientSide()) {
-            ResourceKey<Level> key = ((ServerLevel) level).dimension();
-            Set<BlockPos> set = inhibitorRegistry.get(key);
-            if (set != null) set.remove(worldPosition);
+        // Safe: only removes from static Sets, no world access.
+        if (level != null) {
+            ResourceKey<Level> key = level.dimension();
+            if (!level.isClientSide()) {
+                Set<BlockPos> inhibSet = inhibitorRegistry.get(key);
+                if (inhibSet != null) inhibSet.remove(worldPosition);
+            }
+            Set<BlockPos> silSet = silencerRegistry.get(key);
+            if (silSet != null) silSet.remove(worldPosition);
         }
         super.setRemoved();
     }

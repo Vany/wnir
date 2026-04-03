@@ -9,6 +9,7 @@
         {"type": "minecraft:item", "name": "wnir:teleporter_inhibitor",  "weight": 3},
         {"type": "minecraft:item", "name": "wnir:lighting_post",         "weight": 3},
         {"type": "minecraft:item", "name": "wnir:hurt_post",             "weight": 3},
+        {"type": "minecraft:item", "name": "wnir:silencer_post",        "weight": 3},
         {"type": "minecraft:empty", "weight": 11}
       ]
     }

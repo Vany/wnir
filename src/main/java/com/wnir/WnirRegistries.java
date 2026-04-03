@@ -272,13 +272,22 @@ public final class WnirRegistries {
                 .noOcclusion()
                 .randomTicks());
 
+    private static final SimpleBlockBundle<SilencerPostBlock> SILENCER_POST =
+        registerSimpleBlock("silencer_post", SilencerPostBlock::new,
+            BlockBehaviour.Properties.of()
+                .mapColor(MapColor.SNOW)
+                .sound(SoundType.WOOL)
+                .strength(0.1f)
+                .noOcclusion()
+                .randomTicks());
+
     /** Single shared BE type for all warding column blocks. */
     private static final Supplier<BlockEntityType<WardingColumnBlockEntity>> WARDING_COLUMN_BE =
         BLOCK_ENTITIES.register("warding_column", () -> {
             Set<Block> blocks = Set.of(
                 WARDING_POST.block.get(), TELEPORTER_INHIBITOR.block.get(),
                 REPELLING_POST.block.get(), LIGHTING_POST.block.get(),
-                HURT_POST.block.get()
+                HURT_POST.block.get(), SILENCER_POST.block.get()
             );
             return new BlockEntityType<>(WardingColumnBlockEntity::create, blocks);
         });
@@ -480,6 +489,7 @@ public final class WnirRegistries {
     public static final Supplier<BlockItem> REPELLING_POST_ITEM = REPELLING_POST.item;
     public static final Supplier<BlockItem> LIGHTING_POST_ITEM = LIGHTING_POST.item;
     public static final Supplier<BlockItem> HURT_POST_ITEM = HURT_POST.item;
+    public static final Supplier<BlockItem> SILENCER_POST_ITEM = SILENCER_POST.item;
     public static final Supplier<BlockItem> ANTI_WITHER_ITEM = ANTI_WITHER.item;
     public static final Supplier<BlockItem> EE_CLOCK_ITEM = EE_CLOCK.item;
     public static final Supplier<BlockItem> EE_CLOCK_BUDDING_CRYSTAL_ITEM = EE_CLOCK_BUDDING_CRYSTAL.item;
@@ -502,6 +512,7 @@ public final class WnirRegistries {
                     output.accept(REPELLING_POST_ITEM.get());
                     output.accept(LIGHTING_POST_ITEM.get());
                     output.accept(HURT_POST_ITEM.get());
+                    output.accept(SILENCER_POST_ITEM.get());
                     output.accept(ANTI_WITHER_ITEM.get());
                     output.accept(EE_CLOCK_ITEM.get());
                     output.accept(EE_CLOCK_BUDDING_CRYSTAL_ITEM.get());
