@@ -4,7 +4,9 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 import net.minecraft.core.BlockPos;
+import net.minecraft.core.Registry;
 import net.minecraft.core.registries.BuiltInRegistries;
+import net.minecraft.core.registries.Registries;
 import net.minecraft.resources.Identifier;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
@@ -17,6 +19,9 @@ import net.minecraft.world.level.Level;
 import net.minecraft.world.level.biome.MobSpawnSettings;
 import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.level.levelgen.structure.Structure;
+import net.minecraft.world.level.levelgen.structure.StructureSpawnOverride;
+import net.minecraft.world.level.levelgen.structure.StructureStart;
 import net.minecraft.world.level.storage.ValueInput;
 import net.minecraft.world.level.storage.ValueOutput;
 import net.neoforged.neoforge.fluids.FluidStack;
@@ -128,18 +133,34 @@ public class SpawnerBlockEntity extends BlockEntity {
     private void scanBiome(ServerLevel level, BlockPos pos) {
         candidates.clear();
         totalWeight = 0;
-        List<Weighted<MobSpawnSettings.SpawnerData>> spawns = level.getBiome(pos).value()
-            .getMobSettings().getMobs(MobCategory.MONSTER).unwrap();
-        for (Weighted<MobSpawnSettings.SpawnerData> weighted : spawns) {
-            MobSpawnSettings.SpawnerData data = weighted.value();
-            int weight = weighted.weight();
-            if (weight <= 0) continue;
-            @SuppressWarnings("unchecked")
-            EntityType<? extends Mob> mobType = (EntityType<? extends Mob>) data.type();
-            int xp = getBaseXp(mobType, level);
-            candidates.add(new SpawnCandidate(mobType, weight, xp));
-            totalWeight += weight;
+
+        // Biome mob spawns
+        for (Weighted<MobSpawnSettings.SpawnerData> w : level.getBiome(pos).value()
+                .getMobSettings().getMobs(MobCategory.MONSTER).unwrap()) {
+            addCandidate(w, level);
         }
+
+        // Structure spawn overrides (e.g. Wither Skeletons / Blazes in Nether Fortress)
+        Registry<Structure> structureRegistry = level.registryAccess().lookupOrThrow(Registries.STRUCTURE);
+        for (Structure structure : structureRegistry) {
+            StructureSpawnOverride override = structure.spawnOverrides().get(MobCategory.MONSTER);
+            if (override == null) continue;
+            StructureStart start = level.structureManager().getStructureWithPieceAt(pos, structure);
+            if (!start.isValid()) continue;
+            for (Weighted<MobSpawnSettings.SpawnerData> w : override.spawns().unwrap()) {
+                addCandidate(w, level);
+            }
+        }
+    }
+
+    private void addCandidate(Weighted<MobSpawnSettings.SpawnerData> weighted, ServerLevel level) {
+        int weight = weighted.weight();
+        if (weight <= 0) return;
+        @SuppressWarnings("unchecked")
+        EntityType<? extends Mob> mobType = (EntityType<? extends Mob>) weighted.value().type();
+        int xp = getBaseXp(mobType, level);
+        candidates.add(new SpawnCandidate(mobType, weight, xp));
+        totalWeight += weight;
     }
 
     /** Get base XP by creating a temporary instance (not added to world). */

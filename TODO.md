@@ -1,5 +1,13 @@
 # Ideas to implement later
 
+## Refactoring (copypaste reduction)
+
+- [x] **R7** `DelegateSoundInstance` replaces `QuietSoundInstance` + `SilentSoundInstance`
+- [x] **R1+R2** `WnirHopperMenu` + `WnirHopperScreen` replace 3 menu + 3 screen classes
+- [x] **R3** `WnirHopperBlock` replaces `MossyHopperBlock` / `SteelHopperBlock` / `NetherHopperBlock`
+- [x] **R4** `AbstractWnirHopperBlockEntity` base class extracted; ~200 lines of boilerplate removed
+- [x] **R5+R6** `GrowingCrystalBlockEntity` + `GrowingCrystalMenu` + `GrowingCrystalScreen` replace 6 files; crystal BEs are now ~20 lines each
+
 ## ~~Mossy hopper.~~ DONE
 
 ~~Same as hopper, but have 10 slots for item stacks. When eject items, never eject last item in stack. this will be used as an item sorter.

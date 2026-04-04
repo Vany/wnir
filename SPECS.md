@@ -162,8 +162,8 @@ Item sorter hopper. Extends `HopperBlock` / `RandomizableContainerBlockEntity`.
 - Uses `Capabilities.Item.BLOCK` for ejection — works with vanilla and modded inventories
 
 **GUI:**
-- `MossyHopperMenu` — 10 hopper slots (rows at y=20 and y=38) + standard player inventory (y=64) + hotbar (y=122). `IMAGE_HEIGHT = 149`.
-- `MossyHopperScreen` — renders `wnir:textures/gui/container/mossy_hopper.png` (256×256, assembled from vanilla hopper slices; content occupies top-left 176×149 pixels).
+- `WnirHopperMenu` (variant: `mossy`) — 10 hopper slots (rows at y=20 and y=38) + standard player inventory (y=64) + hotbar (y=122). `IMAGE_HEIGHT = 149`.
+- `WnirHopperScreen` (factory: `"mossy_hopper"`) — renders `wnir:textures/gui/container/mossy_hopper.png` (256×256, assembled from vanilla hopper slices; content occupies top-left 176×149 pixels).
 - Screen registered in `WnirClientSetup` via `RegisterMenuScreensEvent`.
 
 **Recipe:** shaped — `"M M" / "MHM" / " M "`, M = mossy cobblestone, H = hopper → 1 mossy hopper. Category: redstone.
@@ -182,7 +182,7 @@ Created automatically when a `BuddingAmethystBlock` is placed on top of an EE Cl
 
 **Transformation:** when progress reaches `BASE_TICKS`, the block replaces itself with an `EEClockBlock`.
 
-**GUI:** right-click opens `EEClockBuddingCrystalScreen` to show growth progress.
+**GUI:** right-click opens `GrowingCrystalScreen` (factory: `"ee_clock_budding_crystal"`, color `0xFF55AA44`) to show growth progress.
 
 **Acquisition:** crafted or obtained via EE Clock + budding amethyst interaction.
 
@@ -198,7 +198,7 @@ Created automatically when crying obsidian is placed on top of an EE Clock colum
 
 **Transformation:** when fully grown and fuelled, replaces itself with a `PersonalDimensionTeleporterBlock`.
 
-**GUI:** right-click opens `TeleporterCrystalScreen` to insert ender pearls and monitor progress.
+**GUI:** right-click opens `GrowingCrystalScreen` (factory: `"teleporter_crystal"`, color `0xFF9955CC`) to insert ender pearls and monitor progress.
 
 ---
 
@@ -227,6 +227,56 @@ Item that picks up any block (except bedrock/air) with full NBT, then places it 
 Explosion-immune block. Strength 50 (hardness) / 3,600,000 (explosion resistance) — immune to all explosions including the Wither. Requires diamond+ tool to mine.
 
 **Recipe:** shapeless — 8 obsidian + 1 nether star.
+
+---
+
+### Wither Silencer (`wnir:wither_silencer`)
+
+Suppresses `entity.wither.spawn` and `entity.wither.death` sounds **dimension-wide** when at least one Wither Silencer block exists in the dimension.
+
+**Sound mechanics:**
+- Wither spawn/death sounds are global level events with no meaningful world position — chunk-based distance checks are useless.
+- Suppression is performed client-side in `WitherSilencerHandler.onPlaySound` (`PlaySoundEvent`).
+- Any matching sound is replaced with `DelegateSoundInstance(original, 0f)` (silent delegate).
+- Only those two sounds are silenced; all other Wither sounds remain unaffected.
+
+**Registry:** `WitherSilencerBlockEntity` maintains a static `Map<ResourceKey<Level>, Set<BlockPos>>`. `onLoad` adds, `setRemoved` removes. `WnirMod.onServerStopping` calls `clearRegistry()`.
+
+**Properties:** strength 50 / blast resistance 3,600,000. Tags: `minecraft:wither_immune`, `minecraft:needs_diamond_tool`. Listed in `minecraft:mineable/pickaxe`.
+
+**Recipe:** shapeless — silencer_post + nether_star → 1 wither_silencer.
+
+---
+
+### Spawner (`wnir:spawner`)
+
+Consumes Magic Cellulose fluid to spawn hostile mobs. Mob pool is determined at first tick by scanning the biome spawn list AND active structure spawn overrides at the block's position (e.g. Wither Skeletons / Blazes in a Nether Fortress).
+
+**Parameters (static constants):**
+
+| Field | Value | Meaning |
+|-------|-------|---------|
+| `TANK_CAPACITY` | 16 000 mB | Fluid tank size |
+| `FLUID_PER_TICK` | 10 mB | Drained each active tick |
+| `XP_PER_TICK` | 5 | XP accumulated per tick |
+| `SPAWN_COST_MULTIPLIER` | 20 | `mob base XP × 20` = ticks to spawn |
+
+**Tick logic:**
+1. On first tick: `scanBiome()` — fills `candidates` list from biome MONSTER spawns + structure overrides.
+2. Pause if redstone signal present.
+3. Pause if fluid < `FLUID_PER_TICK`.
+4. Drain 10 mB, accumulate 5 XP.
+5. When `accumulatedXp >= targetXp`: spawn mob above, pick new target.
+
+**Mob selection:** weighted random by spawn weight. Cost = `max(1, baseXp) × 20` ticks.
+
+**Structure scan:** iterates `Registry<Structure>` from `level.registryAccess()`. For each structure with a MONSTER `StructureSpawnOverride`, checks `level.structureManager().getStructureWithPieceAt(pos, structure).isValid()`.
+
+**Kill credit:** spawned mob receives `damageSources().playerAttack(installer)` for 1.0f HP — grants kill credit to the installer player (stored UUID set in `setPlacedBy`).
+
+**Redstone:** `level.hasNeighborSignal(pos)` pauses operation; fluid is not drained.
+
+**Fluid capability:** `Capabilities.Fluid.BLOCK` registered in `WnirMod`; accepts only `wnir:magic_cellulose` (still variant).
 
 ---
 
@@ -405,7 +455,7 @@ Applied via transient modifier on `PlayerTickEvent.Post`.
 
 Tab ID: `wnir:wnir`. Title: "When Nothing Is Ready". Icon: chunk_loader.
 
-Contains: chunk_loader, spawner_agitator, warding_post, teleporter_inhibitor, repelling_post, antiwither, ee_clock, ee_clock_budding_crystal, teleporter_crystal, mossy_hopper, personal_dimension_teleporter, blue_sticky_tape, skull_beehive, magic_cellulose_bucket, celluloser.
+Contains: chunk_loader, spawner_agitator, warding_post, teleporter_inhibitor, repelling_post, antiwither, wither_silencer, ee_clock, ee_clock_budding_crystal, teleporter_crystal, mossy_hopper, steel_hopper, nether_hopper, personal_dimension_teleporter, blue_sticky_tape, skull_beehive, magic_cellulose_bucket, celluloser, spawner.
 
 ---
 
@@ -506,9 +556,37 @@ High-throughput version of the Mossy Hopper. Renders as iron.
 - No slot-lock restriction (unlike Mossy Hopper — all slots eligible)
 - Uses `Capabilities.Item.BLOCK` for ejection — works with vanilla and modded inventories
 
-**GUI:** `SteelHopperMenu` + `SteelHopperScreen` — identical layout to Mossy Hopper.
+**GUI:** `WnirHopperMenu` (variant: `steel`) + `WnirHopperScreen` (factory: `"steel_hopper"`) — identical layout to Mossy Hopper.
 
 **Recipe:** shaped — `"I I" / "IHI" / " I "`, I = iron_ingot, H = hopper.
+
+---
+
+### Nether Hopper (`wnir:nether_hopper`)
+
+Regulator hopper. Fills a target inventory with exactly one of each item type. Renders as netherrack.
+
+**Slots:** 10 (two rows of 5). GUI opens on right-click.
+
+**Transfer logic (every 8 ticks):**
+- Pull from above via `HopperBlockEntity.suckInItems()`
+- Eject: count occupied slots in target = N; pull from hopper slot N; regulator check; push 1 item to first accepting empty target slot
+- **Regulator rule:** if target already contains the item type from hopper slot N, skip — nothing is inserted
+- This ensures at most one of each item type ends up in the target
+
+**Eject path decision:**
+1. If target block entity implements `Container` → slot-count-mapped path (`countOccupied` via `Container.getItem`)
+2. Else → capability fallback via `Capabilities.Item.BLOCK`: iterates hopper slots in order, skips any item already in target (check via aborted-transaction extract), inserts the first eligible item
+
+**GUI:** `WnirHopperMenu` (variant: `nether`) + `WnirHopperScreen` (factory: `"nether_hopper"`) — identical layout to Mossy/Steel Hopper. Texture: `nether_hopper.png` (placeholder copy of mossy_hopper.png; needs netherrack-themed art).
+
+**Recipe:** shaped — `"M M" / "MHM" / " M "`, M = netherrack, H = hopper → 1 nether hopper. Category: redstone.
+
+**Properties:** nether map color, nether bricks sound, strength 3.0, `requiresCorrectToolForDrops()`, `noOcclusion()`. Listed in `minecraft:mineable/pickaxe` tag.
+
+**Model:** parent `minecraft:block/hopper` + `hopper_side` with all textures = `minecraft:block/netherrack`.
+
+**Capability registration:** `Capabilities.Item.BLOCK` → `VanillaContainerWrapper.of(be)` (same as other hoppers).
 
 ---
 

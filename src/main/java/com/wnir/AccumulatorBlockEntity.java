@@ -66,8 +66,11 @@ public class AccumulatorBlockEntity extends BlockEntity {
         super.loadAdditional(input);
         capacity = input.getLongOr("capacity", BASE_CAPACITY);
         long storedEnergy = input.getLongOr("energy", 0L);
-        // Rebuild handler with correct capacity and energy — must happen after load
+        // Rebuild handler with correct capacity and energy — must happen after load.
+        // invalidateCapabilities() follows so any mod that cached the old handler reference
+        // (e.g. Tesseract, Pipez) is forced to re-query instead of using the stale object.
         energyHandler = buildHandler(capacity, storedEnergy);
+        invalidateCapabilities();
     }
 
     @Override

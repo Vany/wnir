@@ -1,6 +1,7 @@
 {
   "replace": false,
   "values": [
-    "wnir:antiwither"
+    "wnir:antiwither",
+    "wnir:wither_silencer"
   ]
 }

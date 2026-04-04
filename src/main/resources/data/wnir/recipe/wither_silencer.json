@@ -1,0 +1,12 @@
+{
+  "type": "minecraft:crafting_shapeless",
+  "category": "misc",
+  "ingredients": [
+    "wnir:silencer_post",
+    "minecraft:nether_star"
+  ],
+  "result": {
+    "id": "wnir:wither_silencer",
+    "count": 1
+  }
+}

@@ -43,7 +43,7 @@ Deploy: `make build`, then copy jar from `build/libs/` to test instance.
 
 ## Architecture Notes
 
-- **WnirMod.java** — `@Mod("wnir")`. Brewing recipe on `NeoForge.EVENT_BUS`. Server start: `ChunkLoaderData.forceAll()`. Server stop: `SpawnerAgitatorBlockEntity.unbindAll()`, `WardingColumnBlockEntity.clearRegistry()`, `ChunkLoaderData.reset()`.
+- **WnirMod.java** — `@Mod("wnir")`. Brewing recipe on `NeoForge.EVENT_BUS`. Server start: `ChunkLoaderData.forceAll()`. Server stop: `SpawnerAgitatorBlockEntity.unbindAll()`, `WardingColumnBlockEntity.clearRegistry()`, `ChunkLoaderData.reset()`, `WitherSilencerBlockEntity.clearRegistry()`.
 - **WnirRegistries.java** — All `DeferredRegister` for blocks, items, block entities, mob effects, potions, creative tab.
 - **WnirEffects.java** — `public static MobEffect marker(int color)` factory. Effects are pure markers; all behavior is in handlers.
 - **ColumnHelper** — `countBelow`, `forEachInMixedColumn`, `isTopOfMixedColumn`, mixed-column traversal.
@@ -57,6 +57,24 @@ Deploy: `make build`, then copy jar from `build/libs/` to test instance.
 - **AccelerateHandler** — scales arrow velocity on `EntityJoinLevelEvent`.
 - **HomingArcheryHandler** — cancels arrow, spawns `ShulkerBullet`; tracks damage via `ConcurrentHashMap<UUID, TrackedBullet>` (stale entries cleaned after 60s).
 - **InsaneLightHandler** — 2× mob `FOLLOW_RANGE` via `ADD_MULTIPLIED_BASE + 1.0`; refreshed every 40 ticks.
+- **WitherSilencerHandler** — `PlaySoundEvent` listener. If the sound is `entity.wither.spawn` or `entity.wither.death` AND at least one `WitherSilencerBlockEntity` exists in the current dimension → replace sound with `DelegateSoundInstance(original, 0f)`. No position check — Wither sounds are global.
+
+## Hopper / Crystal Refactoring (unified classes)
+
+All 3 hopper variants (mossy, steel, nether) and both crystal variants (ee_clock_budding, teleporter) now share unified base classes. Pattern: static factory methods in the shared class reference WnirRegistries fields to avoid self-reference in static initializer lambdas.
+
+| New class | Replaces | Notes |
+|-----------|---------|-------|
+| `WnirHopperBlock` | `MossyHopperBlock`, `SteelHopperBlock`, `NetherHopperBlock` | Variant injected via constructor + `Supplier<BlockEntityType>` + ticker lambda |
+| `WnirHopperMenu` | `MossyHopperMenu`, `SteelHopperMenu`, `NetherHopperMenu` | Static factories: `mossy()`, `steel()`, `nether()` — reference `WnirRegistries.*_MENU` at call time |
+| `WnirHopperScreen` | `MossyHopperScreen`, `SteelHopperScreen`, `NetherHopperScreen` | `factory(textureName)` → `MenuScreens.ScreenConstructor<WnirHopperMenu, WnirHopperScreen>` |
+| `AbstractWnirHopperBlockEntity` | duplicated fields/NBT/Container across 3 classes | Abstract `tryEject(level, pos, targetPos)` template method; `tick()` static helper |
+| `GrowingCrystalBlockEntity` | `EEClockBuddingCrystalBlockEntity` (190 lines), `TeleporterCrystalBlockEntity` (190 lines) | Abstract `transformState()`, `revertState()`, `menuType()`; static `tick()` + `countEEClocksBelow()` |
+| `GrowingCrystalMenu` | `EEClockBuddingCrystalMenu`, `TeleporterCrystalMenu` | Static factories: `eeClock()`, `teleporter()` |
+| `GrowingCrystalScreen` | `EEClockBuddingCrystalScreen`, `TeleporterCrystalScreen` | `factory(textureName, colorProgress)` → `MenuScreens.ScreenConstructor` |
+| `DelegateSoundInstance` | `QuietSoundInstance` + `SilentSoundInstance` inner classes | Single `factor` param: `0f` = silent, `0.1f` = attenuated |
+
+**Self-reference pattern fix:** `new MenuType<>((id, inv) -> new WnirHopperMenu(MOSSY_HOPPER_MENU.get(), id, inv))` fails because `MOSSY_HOPPER_MENU` isn't initialized yet. Solution: `new MenuType<>(WnirHopperMenu::mossy)` where `mossy()` is defined in `WnirHopperMenu` and dereferences `WnirRegistries.MOSSY_HOPPER_MENU.get()` at call time (runtime, not init time).
 
 ## NeoForge Item Transfer API (1.21.11)
 
@@ -87,15 +105,18 @@ Deploy: `make build`, then copy jar from `build/libs/` to test instance.
 
 ## New Blocks/Items Added
 
-- **MossyHopperBlock** — extends `HopperBlock`. 10-slot sorter hopper. `MossyHopperBlockEntity` extends `RandomizableContainerBlockEntity`, implements `Hopper`. Never ejects last item. 2 items/8 ticks from random eligible slots. GUI via `MossyHopperMenu` + `MossyHopperScreen`. Client setup in `WnirClientSetup` (`@EventBusSubscriber`, `RegisterMenuScreensEvent`).
-- **EEClockBuddingCrystalBlock/BE/Menu/Screen** — grows over 168000 ticks (÷ EE Clock column height below). Transforms into `EEClockBlock` when complete. Created when budding amethyst is placed on EE Clock column. Does NOT accelerate via EE Clock ticker (guarded in `EEClockBlockEntity`).
-- **TeleporterCrystalBlock/BE/Menu/Screen** — same growth schedule; requires 16 ender pearls (14 via GUI + 2 at transform). Created when crying obsidian is placed on EE Clock column. Transforms into `PersonalDimensionTeleporterBlock`.
+- **WnirHopperBlock** + **AbstractWnirHopperBlockEntity** — unified hopper block/BE. Three variants: mossy (sorter, 2 items/8t, no last-item eject), steel (8 items/8t, unrestricted), nether (regulator: slot-N mapped, skips if target has that type). All use `Capabilities.Item.BLOCK` for ejection; expose own cap via `VanillaContainerWrapper.of(be)`.
+- **NetherHopperBlockEntity** — dual eject path: `Container` (slot-count-mapped) + `Capabilities.Item.BLOCK` fallback. Nested `Transaction.openRoot()` forbidden — check tx must close before insert tx.
+- **GrowingCrystalBlockEntity/Menu/Screen** — abstract base for EEClockBuddingCrystal and TeleporterCrystal. Grows over 168000 ticks ÷ EE Clock column height. Crystal BEs now ~20 lines each (just overrides). EEClock variant transforms to EEClockBlock; Teleporter variant requires 16 ender pearls, transforms to PersonalDimensionTeleporter.
+- **WitherSilencerBlock/BE/Handler** — suppresses `entity.wither.spawn` + `entity.wither.death` dimension-wide. Static registry `Map<ResourceKey<Level>, Set<BlockPos>>` in BE. `DelegateSoundInstance(sound, 0f)` replaces the sound. Indestructible (strength 50, BR 3.6M). Tags: `wither_immune`, `needs_diamond_tool`. Recipe: silencer_post + nether_star (shapeless).
+- **SpawnerBlock/BE** — consumes Magic Cellulose to spawn biome+structure mobs above the block. Structure scan: `Registry<Structure>` iteration + `getStructureWithPieceAt`. Pauses on redstone. Kill credit via `playerAttack(installer)` 1.0f hit.
 - **PersonalDimensionTeleporterBlock** — teleports player to `wnir:personal` dimension. Head mechanic: player skull → owner only; mob skull → any player; no skull → locked. Requires full hunger (20/20); drains hunger to 0 on use. Per-player X-axis regions (`PersonalBiomeSource.REGION_WIDTH` wide), spawn on surface at region center.
 - **BlueStickyTapeItem** — picks up any block (except bedrock/air) with full NBT; places back on right-click. Clears container before removal to prevent dupe. Name: "Wrapped \<block\>". Tooltip: container contents + spawner entity type.
 - **OverCrookingHandler** — hoe enchantment via `BlockDropsEvent`; multiplies leaf drops (not saplings/sticks) by `level + 1`.
 - **CelluloserBlock/BE/Menu/Screen** — enchanted book + water + FE → magic cellulose fluid. NeoForge energy+fluid capabilities. GUI: energy bar + water tank + cellulose tank + progress arrow; fill sprites packed at y=168 in 256×256 texture. Recipe: emerald/brush/shears/lectern/gold_ingot.
 - **Magic Cellulose fluid** — `wnir:magic_cellulose` (still + flowing); bucket `wnir:magic_cellulose_bucket`. Registered before ITEMS (fluid static block initializer pattern).
 - **Martial Lightning potion** — `wnir:martial_lightning`; Awkward + Golden Sword → 3600t amplifier 0.
+- **DelegateSoundInstance** — `SoundInstance` wrapper. Single `factor` field: `0f` = silent, `0.1f` = attenuated. Replaces former `QuietSoundInstance` and `SilentSoundInstance` inner classes in separate handlers.
 
 ## Item Rendering — SpecialModelRenderer (1.21.11)
 

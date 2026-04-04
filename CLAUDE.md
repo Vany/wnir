@@ -55,6 +55,9 @@ No tests exist. `make test` runs `./gradlew test` but there are no test sources.
 - **RepellingPostBlock / RepellingPostBlockEntity** — (currently no unique behavior beyond warding post base)
 - **EEClockBlock / EEClockBlockEntity** — Column-based machine accelerator. N extra ticks/game-tick for the machine above or below the column.
 - **AntiWitherBlock** — Explosion-immune block (resistance 3,600,000). No block entity.
+- **MossyHopperBlock / MossyHopperBlockEntity** — 10-slot sorter hopper. Never ejects last item (count > 1 required). 2 items/8 ticks from random eligible slots.
+- **SteelHopperBlock / SteelHopperBlockEntity** — 10-slot high-throughput hopper. 8 items/8 ticks, no slot restriction.
+- **NetherHopperBlock / NetherHopperBlockEntity** — 10-slot regulator hopper. Counts occupied target slots (= N), pulls from hopper slot N, inserts only if target lacks that item type. Dual path: `Container` (slot-count-mapped) + `Capabilities.Item.BLOCK` fallback. Never open nested `Transaction.openRoot()` — close check tx before opening insert tx.
 
 **Critical pattern**: Never do world access (`getBlockState`, `getBlockEntity`, `setChunkForced`) in `setRemoved()` — it causes infinite loops during chunk unload. Use `playerWillDestroy()` on the Block class instead.
 

@@ -53,10 +53,11 @@ public class WnirClientSetup {
 
     @SubscribeEvent
     public static void onRegisterMenuScreens(RegisterMenuScreensEvent event) {
-        event.register(WnirRegistries.MOSSY_HOPPER_MENU.get(), MossyHopperScreen::new);
-        event.register(WnirRegistries.STEEL_HOPPER_MENU.get(), SteelHopperScreen::new);
-        event.register(WnirRegistries.EE_CLOCK_BUDDING_CRYSTAL_MENU.get(), EEClockBuddingCrystalScreen::new);
-        event.register(WnirRegistries.TELEPORTER_CRYSTAL_MENU.get(), TeleporterCrystalScreen::new);
+        event.register(WnirRegistries.MOSSY_HOPPER_MENU.get(),  WnirHopperScreen.factory("mossy_hopper"));
+        event.register(WnirRegistries.STEEL_HOPPER_MENU.get(),  WnirHopperScreen.factory("steel_hopper"));
+        event.register(WnirRegistries.NETHER_HOPPER_MENU.get(), WnirHopperScreen.factory("nether_hopper"));
+        event.register(WnirRegistries.EE_CLOCK_BUDDING_CRYSTAL_MENU.get(), GrowingCrystalScreen.factory("ee_clock_budding_crystal", 0xFF55AA44));
+        event.register(WnirRegistries.TELEPORTER_CRYSTAL_MENU.get(),        GrowingCrystalScreen.factory("teleporter_crystal",         0xFF9955CC));
         event.register(WnirRegistries.SKULL_BEEHIVE_MENU.get(), SkullBeehiveScreen::new);
         event.register(WnirRegistries.CELLULOSER_MENU.get(), CelluloserScreen::new);
     }

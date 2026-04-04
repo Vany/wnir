@@ -1,0 +1,17 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "category": "redstone",
+  "pattern": [
+    "M M",
+    "MHM",
+    " M "
+  ],
+  "key": {
+    "M": "minecraft:netherrack",
+    "H": "minecraft:hopper"
+  },
+  "result": {
+    "id": "wnir:nether_hopper",
+    "count": 1
+  }
+}

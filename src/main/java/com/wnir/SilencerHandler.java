@@ -1,16 +1,11 @@
 package com.wnir;
 
 import java.util.Set;
-import javax.annotation.Nullable;
 import net.minecraft.client.Minecraft;
-import net.minecraft.client.resources.sounds.Sound;
 import net.minecraft.client.resources.sounds.SoundInstance;
-import net.minecraft.client.sounds.SoundManager;
-import net.minecraft.client.sounds.WeighedSoundEvents;
 import net.minecraft.core.BlockPos;
 import net.minecraft.resources.Identifier;
 import net.minecraft.resources.ResourceKey;
-import net.minecraft.sounds.SoundSource;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.entity.BlockEntity;
 import net.neoforged.neoforge.client.event.sound.PlaySoundEvent;
@@ -49,37 +44,9 @@ public final class SilencerHandler {
             double dz = z - (pos.getZ() + 0.5);
             double r = wbe.totalRadius;
             if (dx * dx + dz * dz <= r * r) {
-                event.setSound(new QuietSoundInstance(sound, 0.1f));
+                event.setSound(new DelegateSoundInstance(sound, 0.1f));
                 return;
             }
         }
-    }
-
-    /** Delegates all SoundInstance methods to the original, but reduces volume by the given factor. */
-    private static final class QuietSoundInstance implements SoundInstance {
-        private final SoundInstance delegate;
-        private final float factor;
-
-        QuietSoundInstance(SoundInstance delegate, float factor) {
-            this.delegate = delegate;
-            this.factor = factor;
-        }
-
-        @Override public Identifier    getIdentifier()                    { return delegate.getIdentifier(); }
-        @Override @Nullable
-        public WeighedSoundEvents       resolve(SoundManager manager)     { return delegate.resolve(manager); }
-        @Override public Sound          getSound()                        { return delegate.getSound(); }
-        @Override public SoundSource    getSource()                       { return delegate.getSource(); }
-        @Override public boolean        isLooping()                       { return delegate.isLooping(); }
-        @Override public boolean        isRelative()                      { return delegate.isRelative(); }
-        @Override public int            getDelay()                        { return delegate.getDelay(); }
-        @Override public float          getVolume()                       { return delegate.getVolume() * factor; }
-        @Override public float          getPitch()                        { return delegate.getPitch(); }
-        @Override public double         getX()                            { return delegate.getX(); }
-        @Override public double         getY()                            { return delegate.getY(); }
-        @Override public double         getZ()                            { return delegate.getZ(); }
-        @Override public Attenuation    getAttenuation()                  { return delegate.getAttenuation(); }
-        @Override public boolean        canStartSilent()                  { return delegate.canStartSilent(); }
-        @Override public boolean        canPlaySound()                    { return delegate.canPlaySound(); }
     }
 }

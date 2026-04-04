@@ -25,9 +25,13 @@ All items and blocks show a one-sentence description in their tooltip. Hold **SH
   - [Teleporter Crystal](#teleporter-crystal)
   - [Personal Dimension Teleporter](#personal-dimension-teleporter)
   - [Mossy Hopper](#mossy-hopper)
+  - [Steel Hopper](#steel-hopper)
+  - [Nether Hopper](#nether-hopper)
   - [Anti-Wither Block](#anti-wither-block)
+  - [Wither Silencer](#wither-silencer)
   - [Skull Beehive](#skull-beehive)
   - [Celluloser](#celluloser)
+  - [Spawner](#spawner)
 - [Fluids](#fluids)
   - [Magic Cellulose](#magic-cellulose)
 - [Items](#items)
@@ -191,6 +195,42 @@ Right-click to open the GUI. Pulls from above and pushes in its facing direction
 
 ---
 
+### Steel Hopper
+
+A 10-slot high-throughput hopper. Transfers 8 items per 8-tick cycle — no restrictions on which slots are used.
+
+| | |
+|---|---|
+| **Slots** | 10 (two rows of 5) |
+| **Transfer rate** | Up to 8 items per 8 ticks |
+| **Recipe** | Hopper + 5 iron ingots: `"I I" / "IHI" / " I "` |
+| **Tool** | Pickaxe |
+
+---
+
+### Nether Hopper
+
+A regulator hopper. Instead of blindly inserting items, it checks how many non-empty slots the target already has (= N) and pulls from its own slot N. It will not insert an item if the target already contains that item type.
+
+| | |
+|---|---|
+| **Slots** | 10 (two rows of 5) |
+| **Transfer rate** | 1 item per 8 ticks |
+| **Recipe** | Hopper + 5 netherrack: `"M M" / "MHM" / " M "` |
+| **Tool** | Pickaxe |
+
+**How it works:**
+- Count occupied slots in target = N
+- Pull from hopper slot N
+- If target already has that item type → skip (regulator rule)
+- Otherwise push 1 item to the first accepting empty slot in target
+
+This naturally fills a target inventory with exactly one of each item type — each hopper slot controls what goes into the next available target slot.
+
+Supports vanilla containers (slot-mapped) and modded inventories via NeoForge item capability (regulator-only, no slot mapping).
+
+---
+
 ### Anti-Wither Block
 
 Explosion-immune decorative block. Withstands Wither skulls, Creeper and TNT explosions, bed explosions in the Nether — anything.
@@ -200,6 +240,20 @@ Explosion-immune decorative block. Withstands Wither skulls, Creeper and TNT exp
 | **Blast resistance** | 3,600,000 |
 | **Recipe** | Shaped: 8× obsidian + 1× nether star in centre (`"OOO" / "ONO" / "OOO"`) |
 | **Tool** | Diamond pickaxe or better |
+
+---
+
+### Wither Silencer
+
+Completely suppresses Wither spawn and death sounds across the entire dimension. Place anywhere in the dimension — one block is sufficient; the effect is dimension-wide.
+
+| | |
+|---|---|
+| **Blast resistance** | 3,600,000 |
+| **Recipe** | Shapeless: Silencer Post + Nether Star |
+| **Tool** | Diamond pickaxe or better |
+
+The sounds suppressed are `entity.wither.spawn` and `entity.wither.death`. All other Wither sounds (ambient, hurt, shoot) are unaffected. Suppression is client-side — the block registers its position on chunk load and deregisters on removal.
 
 ---
 
@@ -247,6 +301,24 @@ Processes enchanted books, water, and Forge Energy into **Magic Cellulose** flui
 | **Tool** | Pickaxe |
 
 Right-click to open the GUI showing energy bar, water tank, cellulose tank, and progress arrow. Contents are preserved when the block is mined.
+
+---
+
+### Spawner
+
+Consumes **Magic Cellulose** fluid to spawn hostile mobs of the types that naturally appear at its location. Learns which mobs to spawn from the biome's mob spawn list **and** any active structure spawn overrides — so placing it inside a Nether Fortress also produces Wither Skeletons and Blazes.
+
+| | |
+|---|---|
+| **Fluid** | Magic Cellulose (tank: 16,000 mB) |
+| **Rate** | 10 mB/tick consumed; 5 XP/tick accumulated |
+| **Spawn cost** | Mob base XP × 20 ticks |
+| **Redstone** | Signal pauses operation |
+| **Kill credit** | Spawned mobs receive a ½-heart hit attributed to the player who placed the block, so loot tables and XP credit that player |
+| **Recipe** | (crafting recipe or loot — see `data/wnir/recipe/spawner.json`) |
+| **Tool** | Pickaxe |
+
+Mob type is chosen randomly each cycle, weighted by the biome's spawn weight table. The next target is picked immediately after a spawn.
 
 ---
 

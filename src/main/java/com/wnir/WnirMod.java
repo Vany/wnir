@@ -37,6 +37,11 @@ public class WnirMod {
                 (be, side) -> VanillaContainerWrapper.of(be)
             );
             event.registerBlockEntity(
+                Capabilities.Item.BLOCK,
+                WnirRegistries.NETHER_HOPPER_BE.get(),
+                (be, side) -> VanillaContainerWrapper.of(be)
+            );
+            event.registerBlockEntity(
                 Capabilities.Energy.BLOCK,
                 WnirRegistries.CELLULOSER_BE.get(),
                 (be, side) -> be.energyHandler
@@ -76,9 +81,10 @@ public class WnirMod {
         NeoForge.EVENT_BUS.addListener(
             EventPriority.LOWEST, WardingPostTeleportHandler::onEntityTeleport
         );
-        // Client-only: register sound handler via FMLClientSetupEvent to avoid loading client classes on server
+        // Client-only: register sound handlers via FMLClientSetupEvent to avoid loading client classes on server
         modEventBus.addListener((net.neoforged.fml.event.lifecycle.FMLClientSetupEvent e) -> {
             NeoForge.EVENT_BUS.addListener(SilencerHandler::onPlaySound);
+            NeoForge.EVENT_BUS.addListener(WitherSilencerHandler::onPlaySound);
         });
         NeoForge.EVENT_BUS.addListener(
             (net.neoforged.neoforge.event.level.BlockEvent.EntityPlaceEvent e) -> {
@@ -123,6 +129,7 @@ public class WnirMod {
     private void onServerStopping(net.neoforged.neoforge.event.server.ServerStoppingEvent event) {
         SpawnerAgitatorBlockEntity.unbindAll();
         WardingColumnBlockEntity.clearRegistry();
+        WitherSilencerBlockEntity.clearRegistry();
         ChunkLoaderData.reset();
         PersonalDimensionManager.reset();
         MouseyCompassSearchManager.reset();

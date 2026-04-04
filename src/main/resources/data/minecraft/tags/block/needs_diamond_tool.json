@@ -2,6 +2,7 @@
   "replace": false,
   "values": [
     "wnir:antiwither",
+    "wnir:wither_silencer",
     "wnir:personal_dimension_teleporter"
   ]
 }

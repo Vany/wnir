@@ -314,8 +314,8 @@ public final class WnirRegistries {
                 .strength(1.5f)
                 .requiresCorrectToolForDrops());
 
-    private static final BlockBundle<MossyHopperBlock, MossyHopperBlockEntity> MOSSY_HOPPER =
-        registerBlock("mossy_hopper", MossyHopperBlock::new, MossyHopperBlockEntity::new,
+    private static final BlockBundle<WnirHopperBlock, MossyHopperBlockEntity> MOSSY_HOPPER =
+        registerBlock("mossy_hopper", WnirHopperBlock::mossy, MossyHopperBlockEntity::new,
             BlockBehaviour.Properties.of()
                 .mapColor(MapColor.STONE)
                 .requiresCorrectToolForDrops()
@@ -365,14 +365,31 @@ public final class WnirRegistries {
                 .requiresCorrectToolForDrops(),
             (b, p) -> new WnirBlockItem(b, p, "accumulator", WnirBlockItem::accumulatorHeaderLines, null));
 
-    private static final BlockBundle<SteelHopperBlock, SteelHopperBlockEntity> STEEL_HOPPER =
-        registerBlock("steel_hopper", SteelHopperBlock::new, SteelHopperBlockEntity::new,
+    private static final BlockBundle<WnirHopperBlock, SteelHopperBlockEntity> STEEL_HOPPER =
+        registerBlock("steel_hopper", WnirHopperBlock::steel, SteelHopperBlockEntity::new,
             BlockBehaviour.Properties.of()
                 .mapColor(MapColor.METAL)
                 .requiresCorrectToolForDrops()
                 .strength(3.0f)
                 .sound(SoundType.METAL)
                 .noOcclusion());
+
+    private static final BlockBundle<WnirHopperBlock, NetherHopperBlockEntity> NETHER_HOPPER =
+        registerBlock("nether_hopper", WnirHopperBlock::nether, NetherHopperBlockEntity::new,
+            BlockBehaviour.Properties.of()
+                .mapColor(MapColor.NETHER)
+                .requiresCorrectToolForDrops()
+                .strength(3.0f)
+                .sound(SoundType.NETHER_BRICKS)
+                .noOcclusion());
+
+    private static final BlockBundle<WitherSilencerBlock, WitherSilencerBlockEntity> WITHER_SILENCER =
+        registerBlock("wither_silencer", WitherSilencerBlock::new, WitherSilencerBlockEntity::new,
+            BlockBehaviour.Properties.of()
+                .mapColor(MapColor.COLOR_BLACK)
+                .requiresCorrectToolForDrops()
+                .strength(50f, 3_600_000f)
+                .sound(SoundType.STONE));
 
     private static final BlockBundle<SpawnerBlock, SpawnerBlockEntity> SPAWNER =
         registerBlock("spawner", SpawnerBlock::new, SpawnerBlockEntity::new,
@@ -444,17 +461,20 @@ public final class WnirRegistries {
 
     // ── Public accessors ─────────────────────────────────────────────────
 
-    public static final Supplier<MenuType<MossyHopperMenu>> MOSSY_HOPPER_MENU =
-        MENU_TYPES.register("mossy_hopper", () -> new MenuType<>(MossyHopperMenu::new, FeatureFlags.VANILLA_SET));
+    public static final Supplier<MenuType<WnirHopperMenu>> MOSSY_HOPPER_MENU =
+        MENU_TYPES.register("mossy_hopper",  () -> new MenuType<>(WnirHopperMenu::mossy,  FeatureFlags.VANILLA_SET));
 
-    public static final Supplier<MenuType<SteelHopperMenu>> STEEL_HOPPER_MENU =
-        MENU_TYPES.register("steel_hopper", () -> new MenuType<>(SteelHopperMenu::new, FeatureFlags.VANILLA_SET));
+    public static final Supplier<MenuType<WnirHopperMenu>> STEEL_HOPPER_MENU =
+        MENU_TYPES.register("steel_hopper",  () -> new MenuType<>(WnirHopperMenu::steel,  FeatureFlags.VANILLA_SET));
 
-    public static final Supplier<MenuType<EEClockBuddingCrystalMenu>> EE_CLOCK_BUDDING_CRYSTAL_MENU =
-        MENU_TYPES.register("ee_clock_budding_crystal", () -> new MenuType<>(EEClockBuddingCrystalMenu::new, FeatureFlags.VANILLA_SET));
+    public static final Supplier<MenuType<WnirHopperMenu>> NETHER_HOPPER_MENU =
+        MENU_TYPES.register("nether_hopper", () -> new MenuType<>(WnirHopperMenu::nether, FeatureFlags.VANILLA_SET));
 
-    public static final Supplier<MenuType<TeleporterCrystalMenu>> TELEPORTER_CRYSTAL_MENU =
-        MENU_TYPES.register("teleporter_crystal", () -> new MenuType<>(TeleporterCrystalMenu::new, FeatureFlags.VANILLA_SET));
+    public static final Supplier<MenuType<GrowingCrystalMenu>> EE_CLOCK_BUDDING_CRYSTAL_MENU =
+        MENU_TYPES.register("ee_clock_budding_crystal", () -> new MenuType<>(GrowingCrystalMenu::eeClock, FeatureFlags.VANILLA_SET));
+
+    public static final Supplier<MenuType<GrowingCrystalMenu>> TELEPORTER_CRYSTAL_MENU =
+        MENU_TYPES.register("teleporter_crystal", () -> new MenuType<>(GrowingCrystalMenu::teleporter, FeatureFlags.VANILLA_SET));
 
     public static final Supplier<MenuType<SkullBeehiveMenu>> SKULL_BEEHIVE_MENU =
         MENU_TYPES.register("skull_beehive", () -> new MenuType<>(SkullBeehiveMenu::new, FeatureFlags.VANILLA_SET));
@@ -467,6 +487,12 @@ public final class WnirRegistries {
 
     public static final Supplier<BlockEntityType<SteelHopperBlockEntity>> STEEL_HOPPER_BE = STEEL_HOPPER.entity;
     public static final Supplier<BlockItem> STEEL_HOPPER_ITEM = STEEL_HOPPER.item;
+
+    public static final Supplier<BlockEntityType<NetherHopperBlockEntity>> NETHER_HOPPER_BE = NETHER_HOPPER.entity;
+    public static final Supplier<BlockItem> NETHER_HOPPER_ITEM = NETHER_HOPPER.item;
+
+    public static final Supplier<BlockEntityType<WitherSilencerBlockEntity>> WITHER_SILENCER_BE = WITHER_SILENCER.entity;
+    public static final Supplier<BlockItem> WITHER_SILENCER_ITEM = WITHER_SILENCER.item;
 
     public static final Supplier<BlockEntityType<SpawnerAgitatorBlockEntity>> SPAWNER_AGITATOR_BE = SPAWNER_AGITATOR.entity;
     public static final Supplier<BlockEntityType<WardingColumnBlockEntity>> WARDING_COLUMN_BLOCK_ENTITY = WARDING_COLUMN_BE;
@@ -531,6 +557,8 @@ public final class WnirRegistries {
                     output.accept(TELEPORTER_CRYSTAL_ITEM.get());
                     output.accept(MOSSY_HOPPER_ITEM.get());
                     output.accept(STEEL_HOPPER_ITEM.get());
+                    output.accept(NETHER_HOPPER_ITEM.get());
+                    output.accept(WITHER_SILENCER_ITEM.get());
                     output.accept(PERSONAL_DIMENSION_TELEPORTER_ITEM.get());
                     output.accept(BLUE_STICKY_TAPE_ITEM.get());
                     output.accept(SEED_BUNDLE_ITEM.get());
