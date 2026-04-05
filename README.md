@@ -292,16 +292,27 @@ An automated turret that fires arrows at nearby hostile mobs. Load it with bows,
 
 ### Celluloser
 
-Processes enchanted books, water, and Forge Energy into **Magic Cellulose** fluid.
+Processes enchanted books (or configured mod items), water, and Forge Energy into **Magic Cellulose** fluid.
 
 | | |
 |---|---|
-| **Inputs** | Enchanted book (any enchant level) + water + FE |
+| **Inputs** | Enchanted book or configured item + water + FE |
 | **Output** | Magic Cellulose fluid |
 | **Recipe** | Shaped: emerald / brush / shears / lectern / gold ingot |
 | **Tool** | Pickaxe |
 
 Right-click to open the GUI showing energy bar, water tank, cellulose tank, and progress arrow. Contents are preserved when the block is mined.
+
+**Extra item sources:** edit `config/wnir_celluloser.toml` to add non-enchanted items with fixed XP values. The file is created with defaults on first server start:
+
+```toml
+[sources]
+evilcraft:origins_of_darkness = 200
+ars_nouveau:caster_tome = 400
+waystones:attuned_shard = 100
+```
+
+Vanilla hoppers can push items into the Celluloser directly.
 
 ---
 

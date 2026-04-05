@@ -537,10 +537,10 @@ Passive FE buffer. Base capacity 1,000,000 FE. Retains charge when mined — dro
 
 ### Celluloser (`wnir:celluloser`)
 
-Converts enchanted books + water + FE into magic cellulose fluid.
+Converts enchanted books (or configured extra items) + water + FE into magic cellulose fluid.
 
 **Inputs:**
-- Enchanted book (1 slot) — consumed on start; XP calculated from enchantment min-cost formula
+- Item slot (1 slot) — accepts enchanted books OR items listed in `CelluloserConfig`; consumed on start
 - Water (tank, 16 000 mB)
 - FE energy (buffer 1 000 000 FE)
 
@@ -560,9 +560,17 @@ Converts enchanted books + water + FE into magic cellulose fluid.
 **Behaviour:**
 - Pauses (preserves progress) when energy, water, or output space is exhausted
 - Processing resumes automatically when resources are available
-- XP calculated as sum of `levelToXp((minCost + maxCost) / 2)` per enchantment
+- XP for enchanted books: sum of `levelToXp((minCost + maxCost) / 2)` per enchantment
+- XP for config items: fixed value from `wnir_celluloser.toml`
+
+**Extra item sources (`config/wnir_celluloser.toml`):**
+- Loaded once on server start via `CelluloserConfig.load()`
+- Format: `item_registry_id = xp_value` under `[sources]`
+- File created with defaults on first run: `evilcraft:origins_of_darkness = 200`, `ars_nouveau:caster_tome = 400`, `waystones:attuned_shard = 100`
+- Items in this map bypass the enchantment check in `canPlaceItem` — hoppers can push them in
 
 **NeoForge capabilities (registered in `WnirMod`):**
+- `Capabilities.Item.BLOCK` → `VanillaContainerWrapper.of(be)` (all faces — enables vanilla hopper input)
 - `Capabilities.Energy.BLOCK` → `be.energyHandler` (insert only, all faces)
 - `Capabilities.Fluid.BLOCK` → `be.fluidHandler` (insert water slot 0; extract cellulose slot 1)
 

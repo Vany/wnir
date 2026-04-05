@@ -8,6 +8,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ```bash
 make build      # Build the mod
+make install    # Build and install to PrismLauncher test instance
 make run        # Run dev client
 make clean      # Clean build artifacts
 make jar        # Build and show jar location

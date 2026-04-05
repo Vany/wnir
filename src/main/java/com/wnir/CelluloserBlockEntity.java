@@ -15,6 +15,8 @@ import net.minecraft.world.item.Items;
 import net.minecraft.world.item.enchantment.ItemEnchantments;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.Block;
+import net.minecraft.core.registries.BuiltInRegistries;
+import net.minecraft.resources.Identifier;
 import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.material.Fluids;
@@ -184,7 +186,12 @@ public class CelluloserBlockEntity extends BlockEntity implements Container, net
 
     @Override
     public boolean canPlaceItem(int slot, ItemStack stack) {
-        return isEnchanted(stack);
+        return isEnchanted(stack) || isConfigSource(stack);
+    }
+
+    static boolean isConfigSource(ItemStack stack) {
+        Identifier id = BuiltInRegistries.ITEM.getKey(stack.getItem());
+        return id != null && CelluloserConfig.EXTRA_SOURCES.containsKey(id);
     }
 
     static boolean isEnchanted(ItemStack stack) {
@@ -211,11 +218,19 @@ public class CelluloserBlockEntity extends BlockEntity implements Container, net
     public static void serverTick(Level level, BlockPos pos, BlockState state, CelluloserBlockEntity be) {
         boolean changed = false;
 
-        // Consume enchanted item → calculate total XP
+        // Consume item → calculate total XP (enchanted book or config source)
         if (be.remainingXp == 0) {
             ItemStack input = be.items.get(0);
-            if (!input.isEmpty() && isEnchanted(input)) {
-                int xp = calcItemXp(input);
+            if (!input.isEmpty()) {
+                int xp = 0;
+                if (isEnchanted(input)) {
+                    xp = calcItemXp(input);
+                } else {
+                    Identifier id = BuiltInRegistries.ITEM.getKey(input.getItem());
+                    if (id != null) {
+                        xp = CelluloserConfig.EXTRA_SOURCES.getOrDefault(id, 0);
+                    }
+                }
                 if (xp > 0) {
                     be.items.set(0, ItemStack.EMPTY);
                     be.remainingXp = xp;

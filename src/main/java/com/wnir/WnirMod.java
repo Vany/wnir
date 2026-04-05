@@ -42,6 +42,11 @@ public class WnirMod {
                 (be, side) -> VanillaContainerWrapper.of(be)
             );
             event.registerBlockEntity(
+                Capabilities.Item.BLOCK,
+                WnirRegistries.CELLULOSER_BE.get(),
+                (be, side) -> VanillaContainerWrapper.of(be)
+            );
+            event.registerBlockEntity(
                 Capabilities.Energy.BLOCK,
                 WnirRegistries.CELLULOSER_BE.get(),
                 (be, side) -> be.energyHandler
@@ -124,6 +129,7 @@ public class WnirMod {
         }
         // Pre-load personal dimension manager so biome source map is populated before any player joins
         PersonalDimensionManager.get(server);
+        CelluloserConfig.load();
     }
 
     private void onServerStopping(net.neoforged.neoforge.event.server.ServerStoppingEvent event) {

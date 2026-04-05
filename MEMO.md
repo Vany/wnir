@@ -171,6 +171,8 @@ public void render(GuiGraphics g, int mouseX, int mouseY, float partialTick) {
 - **Fluid slot write bypass:** `FluidStacksResourceHandler.isValid()` blocks external insert into slot 1 (cellulose out). Machine tick writes directly with `set(slot, resource, amount)` — bypasses `isValid`.
 - **Transaction API:** `try (var tx = Transaction.openRoot()) { ...; tx.commit(); }` for atomic energy + fluid operations.
 - **XP formula:** `levelToXp(n)` — `n≤16: n²+6n`; `n≤31: 2.5n²−40.5n+360`; `n>31: 4.5n²−162.5n+2220`.
+- **Item capability:** `Capabilities.Item.BLOCK` registered via `VanillaContainerWrapper.of(be)` — required for vanilla hoppers to push into the Celluloser. `canPlaceItem` still gates accepted items (enchanted or config source).
+- **CelluloserConfig:** `config/wnir_celluloser.toml`, plain TOML `[sources]` section, `item_id = xp`. Loaded on server start. File created with defaults if absent. `EXTRA_SOURCES` is a static `Map<Identifier, Integer>` checked in `isConfigSource()` + `serverTick`.
 
 ## GeckoLib Notes (geckolib-neoforge-1.21.11 5.4.5)
 

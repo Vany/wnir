@@ -1,4 +1,4 @@
-.PHONY: build run clean test setup check jar
+.PHONY: build run clean test setup check jar install
 
 # Environment setup
 export PATH := /opt/homebrew/bin:$(PATH)
@@ -31,3 +31,8 @@ check:
 jar: build
 	@echo "Jar location:"
 	@ls -la build/libs/*.jar 2>/dev/null || true
+
+install: jar
+	@echo "Installing to PrismLauncher..."
+	@cp build/libs/wnir-1.21.11-1.0.0.jar "/Users/vany/Library/Application Support/PrismLauncher/instances/VanyLLa3d/minecraft/mods/"
+	@echo "Installed."
