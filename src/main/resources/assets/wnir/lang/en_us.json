@@ -152,7 +152,7 @@
   "tooltip.wnir.blue_sticky_tape.detail": "Right-click to lift a block. Right-click a surface to place. Consumed on placement.",
 
   "tooltip.wnir.mousey_compass": "Finds a block type by spiraling outward from you.",
-  "tooltip.wnir.mousey_compass.detail": "Hold target block in offhand, right-click to search. Right-click again to cancel.",
+  "tooltip.wnir.mousey_compass.detail": "Hold target block in offhand and right-click to search. Or rename a name tag on an anvil and hold it in offhand to search by block name.",
 
   "tooltip.wnir.wireless_fuel": "Draws FE from a linked block to fuel furnaces.",
   "tooltip.wnir.wireless_fuel.detail": "Shift+right-click an energy block to link. 4,000 FE per burn cycle. Never consumed.",

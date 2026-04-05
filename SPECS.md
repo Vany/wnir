@@ -222,6 +222,36 @@ Item that picks up any block (except bedrock/air) with full NBT, then places it 
 
 ---
 
+### Mousey Compass (`wnir:mousey_compass`)
+
+Compass item that searches loaded chunks in a BFS spiral for a target block type.
+
+**Search trigger (`use()` — main hand only):**
+
+| Offhand | Behaviour |
+|---------|-----------|
+| `BlockItem` | Target = registry ID of the held block |
+| `Items.NAME_TAG` with `CUSTOM_NAME` | Target = first block whose `getName().getString()` matches the tag name (case-insensitive, iterates `BuiltInRegistries.BLOCK`) |
+| Anything else | Shows usage hint; returns `FAIL` |
+
+**State stored in `DataComponents.CUSTOM_DATA`:**
+
+| Key | Type | Meaning |
+|-----|------|---------|
+| `"target"` | String | Registry ID of block being searched |
+| `"searching"` | boolean | Search in progress |
+| `"fx"/"fy"/"fz"` | int | Found position (tooltip display) |
+
+**`LODESTONE_TRACKER`** drives the needle: empty optional → spins; `GlobalPos` set → points.
+
+**Tick handler (`onPlayerTick`):** runs each server tick while compass is in main hand and `searching=true`. Delegates one chunk per tick to `MouseyCompassSearchManager`. Points needle at scanned chunk center. On found: calls `lock()` (sets tracker, glint). On exhausted: clears searching flag.
+
+**`MouseyCompassSearchManager`:** BFS spiral keyed by player UUID. One chunk scanned per tick. `MAX_CHUNK_RADIUS = 16`. Unloaded chunks skipped (neighbors still enqueued). Per-section palette check (`maybeHas`) avoids full 4096-block scan when block absent from palette. `reset()` called on server stop.
+
+**Acquisition:** crafted (recipe: `data/wnir/recipe/mousey_compass.json`).
+
+---
+
 ### Antiwither (`wnir:antiwither`)
 
 Explosion-immune block. Strength 50 (hardness) / 3,600,000 (explosion resistance) — immune to all explosions including the Wither. Requires diamond+ tool to mine.

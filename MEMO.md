@@ -117,6 +117,7 @@ All 3 hopper variants (mossy, steel, nether) and both crystal variants (ee_clock
 - **Magic Cellulose fluid** — `wnir:magic_cellulose` (still + flowing); bucket `wnir:magic_cellulose_bucket`. Registered before ITEMS (fluid static block initializer pattern).
 - **Martial Lightning potion** — `wnir:martial_lightning`; Awkward + Golden Sword → 3600t amplifier 0.
 - **DelegateSoundInstance** — `SoundInstance` wrapper. Single `factor` field: `0f` = silent, `0.1f` = attenuated. Replaces former `QuietSoundInstance` and `SilentSoundInstance` inner classes in separate handlers.
+- **MouseyCompassItem** — compass item. Two search modes: `BlockItem` in offhand → search by registry ID; `Items.NAME_TAG` with `CUSTOM_NAME` in offhand → case-insensitive scan of `BuiltInRegistries.BLOCK` by display name. State in `CUSTOM_DATA`; needle driven by `LODESTONE_TRACKER`. BFS search via `MouseyCompassSearchManager` (one chunk/tick, palette pre-check, max radius 16).
 
 ## Item Rendering — SpecialModelRenderer (1.21.11)
 

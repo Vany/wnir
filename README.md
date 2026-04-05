@@ -36,6 +36,7 @@ All items and blocks show a one-sentence description in their tooltip. Hold **SH
   - [Magic Cellulose](#magic-cellulose)
 - [Items](#items)
   - [Blue Sticky Tape](#blue-sticky-tape)
+  - [Mousey Compass](#mousey-compass)
 - [Recipes](#recipes)
   - [Kelp Compression](#kelp-compression)
 - [Mob Effects](#mob-effects)
@@ -357,6 +358,37 @@ Picks up any block (except bedrock and air) along with its full NBT data, then p
 - Tooltip shows spawner entity type when wrapping a mob spawner
 
 **Crafting recipe:** see `data/wnir/recipe/blue_sticky_tape.json`
+
+---
+
+### Mousey Compass
+
+A compass that spirals outward from the player's position to find the nearest instance of a target block.
+
+**Searching by block item:**
+- Hold any block in your offhand
+- Right-click the compass to begin searching
+
+**Searching by name:**
+- Rename a **name tag** on an anvil to the block's display name (e.g. `Chest`, `Nether Brick`, `Wither Skeleton Skull`)
+- Hold the name tag in your offhand
+- Right-click to search — match is case-insensitive
+
+**While searching:**
+- The needle spins toward the currently scanned chunk
+- The action bar shows the current search radius in chunks
+- On success: needle locks onto the found block, item glints, coordinates shown
+- On failure: "Block not found" message, needle resets
+
+**Notes:**
+- Search radius: up to 16 chunks from the player's position
+- Only loaded chunks are scanned; unloaded chunks are skipped and the search continues around them
+- Dropping or switching away from the compass cancels the search
+- Right-click with an empty offhand shows a usage hint
+
+| | |
+|---|---|
+| **Recipe** | see `data/wnir/recipe/mousey_compass.json` |
 
 ---
 

@@ -15,15 +15,18 @@ import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.BlockItem;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.Items;
 import net.minecraft.world.item.TooltipFlag;
+import net.minecraft.world.level.block.Block;
+import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.item.component.CustomData;
 import net.minecraft.world.item.component.LodestoneTracker;
 import net.minecraft.world.item.component.TooltipDisplay;
 import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.Level;
-import net.minecraft.world.level.block.Block;
 import net.neoforged.neoforge.event.tick.PlayerTickEvent;
 
+import java.util.Locale;
 import java.util.Optional;
 import java.util.function.Consumer;
 
@@ -60,21 +63,39 @@ public final class MouseyCompassItem extends Item {
         if (hand != InteractionHand.MAIN_HAND) return InteractionResult.PASS;
 
         ItemStack offhand = player.getOffhandItem();
-        if (!(offhand.getItem() instanceof BlockItem blockItem)) {
+
+        if (offhand.getItem() instanceof BlockItem blockItem) {
+            // Block in offhand — search by registry ID
             if (!level.isClientSide()) {
-                player.displayClientMessage(
-                    Component.literal("Hold a block in your offhand to search"), true);
+                Identifier targetId = BuiltInRegistries.BLOCK.getKey(blockItem.getBlock());
+                if (targetId == null) return InteractionResult.FAIL;
+                beginSearch(player.getItemInHand(hand), targetId, player, (ServerLevel) level);
             }
-            return InteractionResult.FAIL;
+            return InteractionResult.SUCCESS;
+        }
+
+        if (offhand.is(Items.NAME_TAG) && offhand.has(DataComponents.CUSTOM_NAME)) {
+            // Anvil-renamed paper in offhand — search by block display name
+            if (!level.isClientSide()) {
+                String name = offhand.get(DataComponents.CUSTOM_NAME).getString();
+                Block block = findBlockByName(name);
+                if (block == null || block == Blocks.AIR) {
+                    player.displayClientMessage(
+                        Component.literal("No block named '" + name + "'"), true);
+                    return InteractionResult.FAIL;
+                }
+                Identifier targetId = BuiltInRegistries.BLOCK.getKey(block);
+                if (targetId == null) return InteractionResult.FAIL;
+                beginSearch(player.getItemInHand(hand), targetId, player, (ServerLevel) level);
+            }
+            return InteractionResult.SUCCESS;
         }
 
         if (!level.isClientSide()) {
-            Identifier targetId = BuiltInRegistries.BLOCK.getKey(blockItem.getBlock());
-            if (targetId == null) return InteractionResult.FAIL;
-            beginSearch(player.getItemInHand(hand), targetId, player, (ServerLevel) level);
+            player.displayClientMessage(
+                Component.literal("Hold a block or a named paper in your offhand to search"), true);
         }
-
-        return InteractionResult.SUCCESS;
+        return InteractionResult.FAIL;
     }
 
     // ── Server tick handler (registered in WnirMod) ──────────────────────────
@@ -163,6 +184,19 @@ public final class MouseyCompassItem extends Item {
                 ));
             }
         }
+    }
+
+    // ── Block name lookup ─────────────────────────────────────────────────────
+
+    /** Find the first registered block whose display name matches (case-insensitive). */
+    private static Block findBlockByName(String name) {
+        String lower = name.toLowerCase(Locale.ROOT);
+        for (Block block : BuiltInRegistries.BLOCK) {
+            if (block.getName().getString().toLowerCase(Locale.ROOT).equals(lower)) {
+                return block;
+            }
+        }
+        return null;
     }
 
     // ── State mutations ───────────────────────────────────────────────────────
