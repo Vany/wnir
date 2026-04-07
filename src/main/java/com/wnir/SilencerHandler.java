@@ -29,6 +29,7 @@ public final class SilencerHandler {
         if (mc.level == null) return;
 
         double x = sound.getX();
+        double y = sound.getY();
         double z = sound.getZ();
 
         ResourceKey<Level> key = mc.level.dimension();
@@ -41,9 +42,10 @@ public final class SilencerHandler {
             if (!wbe.isBottomOfColumn || wbe.silencerCount == 0) continue;
 
             double dx = x - (pos.getX() + 0.5);
+            double dy = y - (pos.getY() + 0.5);
             double dz = z - (pos.getZ() + 0.5);
             double r = wbe.totalRadius;
-            if (dx * dx + dz * dz <= r * r) {
+            if (dx * dx + dy * dy + dz * dz <= r * r) {
                 event.setSound(new DelegateSoundInstance(sound, 0.1f));
                 return;
             }

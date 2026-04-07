@@ -18,6 +18,7 @@ import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.TrialSpawnerBlock;
 import net.minecraft.world.level.block.VaultBlock;
 import net.minecraft.world.level.block.entity.TrialSpawnerBlockEntity;
+import net.minecraft.world.level.block.entity.trialspawner.TrialSpawnerState;
 import net.minecraft.world.level.block.entity.vault.VaultBlockEntity;
 import net.minecraft.world.level.block.entity.vault.VaultState;
 import net.minecraft.world.level.block.state.BlockState;
@@ -45,7 +46,7 @@ public class MagicCelluloseBucketItem extends BucketItem {
         Level level = ctx.getLevel();
         BlockState blockState = level.getBlockState(ctx.getClickedPos());
 
-        // ── Trial Spawner: reset cooldown timer ────────────────────────────────
+        // ── Trial Spawner: reduce cooldown by 1 hour (72 000 ticks) ──────────────
         if (blockState.getBlock() instanceof TrialSpawnerBlock) {
             if (level.isClientSide()) return InteractionResult.SUCCESS;
             var serverLevel = (net.minecraft.server.level.ServerLevel) level;
@@ -53,13 +54,13 @@ public class MagicCelluloseBucketItem extends BucketItem {
             var player      = ctx.getPlayer();
             if (!(serverLevel.getBlockEntity(pos) instanceof TrialSpawnerBlockEntity spawnerBe))
                 return super.useOn(ctx);
-            CompoundTag beTag = spawnerBe.saveCustomOnly(serverLevel.registryAccess());
-            beTag.getCompound("data").ifPresent(data -> {
-                data.remove("cooldown_ends_at");
-                data.remove("next_mob_spawns_at");
-            });
-            spawnerBe.loadWithComponents(
-                TagValueInput.create(ProblemReporter.DISCARDING, serverLevel.registryAccess(), beTag));
+
+            var ts   = spawnerBe.getTrialSpawner();
+            var data = ts.getStateData();
+            if (ts.getState() != TrialSpawnerState.COOLDOWN) return InteractionResult.PASS;
+
+            long newEnd = Math.max(0L, TrialSpawnerAccessor.getCooldownEndsAt(data) - 72_000L);
+            TrialSpawnerAccessor.setCooldownEndsAt(data, newEnd);
             spawnerBe.setChanged();
             serverLevel.sendBlockUpdated(pos, blockState, blockState, Block.UPDATE_ALL);
             serverLevel.playSound(null, pos, SoundEvents.BUCKET_EMPTY, SoundSource.BLOCKS, 1.0f, 1.0f);

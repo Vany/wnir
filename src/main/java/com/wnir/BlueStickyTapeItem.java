@@ -1,5 +1,6 @@
 package com.wnir;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.function.Consumer;
 import net.minecraft.ChatFormatting;
@@ -117,6 +118,72 @@ public class BlueStickyTapeItem extends Item {
                 );
             })
         );
+
+        // Trial spawner: mob list + non-default modifiers
+        beTag.getCompound("normal_config").ifPresent(normalCfg -> {
+            List<String> normalMobs = trialMobIds(normalCfg);
+            for (String id : normalMobs) {
+                Identifier eid = Identifier.tryParse(id);
+                if (eid != null) consumer.accept(
+                    Component.translatable("entity." + eid.getNamespace() + "." + eid.getPath())
+                        .withStyle(ChatFormatting.GRAY));
+            }
+
+            beTag.getCompound("ominous_config").ifPresent(ominousCfg -> {
+                List<String> ominousMobs = trialMobIds(ominousCfg);
+                if (!ominousMobs.isEmpty() && !ominousMobs.equals(normalMobs)) {
+                    consumer.accept(Component.literal("ominous:").withStyle(ChatFormatting.DARK_PURPLE));
+                    for (String id : ominousMobs) {
+                        Identifier eid = Identifier.tryParse(id);
+                        if (eid != null) consumer.accept(
+                            Component.translatable("entity." + eid.getNamespace() + "." + eid.getPath())
+                                .withStyle(ChatFormatting.DARK_PURPLE));
+                    }
+                }
+            });
+
+            // Non-default modifiers from normal_config
+            normalCfg.getFloat("total_mobs")
+                .filter(v -> v != 6.0f)
+                .ifPresent(v -> consumer.accept(
+                    Component.literal("mobs/wave: " + Math.round(v)).withStyle(ChatFormatting.DARK_AQUA)));
+            normalCfg.getFloat("simultaneous_mobs")
+                .filter(v -> v != 2.0f)
+                .ifPresent(v -> consumer.accept(
+                    Component.literal("concurrent: " + Math.round(v)).withStyle(ChatFormatting.DARK_AQUA)));
+            normalCfg.getInt("ticks_between_spawn")
+                .filter(v -> v != 40)
+                .ifPresent(v -> consumer.accept(
+                    Component.literal("interval: " + v + "t").withStyle(ChatFormatting.DARK_AQUA)));
+        });
+
+        // Cooldown (root-level, shared for both configs)
+        beTag.getInt("target_cooldown_length")
+            .filter(v -> v != 36000)
+            .ifPresent(v -> consumer.accept(
+                Component.literal("restart: " + formatTicks(v)).withStyle(ChatFormatting.DARK_AQUA)));
+    }
+
+    private static List<String> trialMobIds(CompoundTag config) {
+        List<String> ids = new ArrayList<>();
+        config.getList("spawn_potentials").ifPresent(list -> {
+            for (Tag t : list) {
+                if (!(t instanceof CompoundTag entry)) continue;
+                entry.getCompound("data").ifPresent(data ->
+                    data.getCompound("entity").ifPresent(entity ->
+                        entity.getString("id").ifPresent(id -> {
+                            if (!ids.contains(id)) ids.add(id);
+                        })
+                    )
+                );
+            }
+        });
+        return ids;
+    }
+
+    private static String formatTicks(int ticks) {
+        int secs = ticks / 20;
+        return secs >= 60 ? (secs / 60) + "min" : secs + "s";
     }
 
     // -------------------------------------------------------------------------

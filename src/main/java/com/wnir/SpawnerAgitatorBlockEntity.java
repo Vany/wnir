@@ -12,6 +12,8 @@ import net.minecraft.world.level.BaseSpawner;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.block.entity.SpawnerBlockEntity;
+import net.minecraft.world.level.block.entity.TrialSpawnerBlockEntity;
+import net.minecraft.world.level.block.entity.trialspawner.TrialSpawnerState;
 import net.minecraft.world.level.block.state.BlockState;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
@@ -19,15 +21,17 @@ import org.apache.logging.log4j.Logger;
 public class SpawnerAgitatorBlockEntity extends BlockEntity {
 
     private static final Logger LOGGER = LogManager.getLogger();
-    private static final int AGITATED_RANGE = -1;
+    /** 32767 = effectively infinite range; -1 would block the server shutdown save loop. */
+    private static final int AGITATED_RANGE = 32767;
     private static final Set<SpawnerAgitatorBlockEntity> BOUND_AGITATORS =
         Collections.newSetFromMap(new ConcurrentHashMap<>());
     private static final String TAG_SPAWNER_COUNT = "SpawnerCount";
     private static final String TAG_ORIGINAL_RANGE = "OriginalRange_";
     private static final String TAG_ORIGINAL_MIN_DELAY = "OriginalMinDelay_";
     private static final String TAG_ORIGINAL_MAX_DELAY = "OriginalMaxDelay_";
+    private static final String TAG_ORIGINAL_MAX_NEARBY = "OriginalMaxNearby_";
 
-    private record SpawnerState(int range, int minDelay, int maxDelay) {}
+    private record SpawnerState(int range, int minDelay, int maxDelay, int maxNearbyEntities) {}
 
     private final List<BaseSpawner> cachedSpawners = new ArrayList<>();
     private final List<SpawnerState> originalStates = new ArrayList<>();
@@ -76,7 +80,8 @@ public class SpawnerAgitatorBlockEntity extends BlockEntity {
                 originalStates.add(new SpawnerState(
                     SpawnerAccessor.getRange(spawner),
                     SpawnerAccessor.getMinDelay(spawner),
-                    SpawnerAccessor.getMaxDelay(spawner)
+                    SpawnerAccessor.getMaxDelay(spawner),
+                    SpawnerAccessor.getMaxNearbyEntities(spawner)
                 ));
             }
             persistOriginals();
@@ -98,6 +103,7 @@ public class SpawnerAgitatorBlockEntity extends BlockEntity {
     }
 
     void unbindSpawner() {
+        LOGGER.info("Agitator unbind CALLED at {}", worldPosition, new Exception("unbind caller"));
         if (!cachedSpawners.isEmpty() && SpawnerAccessor.isAvailable()) {
             int count = Math.min(cachedSpawners.size(), originalStates.size());
             for (int i = 0; i < count; i++) {
@@ -106,6 +112,7 @@ public class SpawnerAgitatorBlockEntity extends BlockEntity {
                 if (state.range >= 0) SpawnerAccessor.setRange(spawner, state.range);
                 if (state.minDelay >= 0) SpawnerAccessor.setMinDelay(spawner, state.minDelay);
                 if (state.maxDelay >= 0) SpawnerAccessor.setMaxDelay(spawner, state.maxDelay);
+                if (state.maxNearbyEntities > 0) SpawnerAccessor.setMaxNearbyEntities(spawner, state.maxNearbyEntities);
             }
             LOGGER.info(
                 "Agitator unbind at {} — restored {} spawners, originals={}",
@@ -129,25 +136,7 @@ public class SpawnerAgitatorBlockEntity extends BlockEntity {
             SpawnerState state = originalStates.get(index);
             if (state.minDelay > 0) SpawnerAccessor.setMinDelay(spawner, Math.max(1, state.minDelay / n));
             if (state.maxDelay > 0) SpawnerAccessor.setMaxDelay(spawner, Math.max(1, state.maxDelay / n));
-        }
-    }
-
-    void recheckSpawners() {
-        if (level == null || level.isClientSide()) return;
-        if (level.getBlockState(worldPosition.above()).getBlock() instanceof SpawnerAgitatorBlock) return;
-
-        recalcStackSize();
-
-        int currentCount = 0;
-        BlockPos check = worldPosition.above();
-        while (level.getBlockState(check).is(Blocks.SPAWNER)) {
-            currentCount++;
-            check = check.above();
-        }
-
-        if (currentCount != cachedSpawners.size()) {
-            if (!cachedSpawners.isEmpty()) unbindSpawner();
-            if (currentCount > 0) bindSpawner();
+            if (state.maxNearbyEntities > 0) SpawnerAccessor.setMaxNearbyEntities(spawner, state.maxNearbyEntities * n);
         }
     }
 
@@ -161,18 +150,23 @@ public class SpawnerAgitatorBlockEntity extends BlockEntity {
         }
     }
 
-    void onNeighborChanged() {
-        if (level == null || level.isClientSide()) return;
-        BlockPos above = worldPosition.above();
-        if (level.getBlockState(above).getBlock() instanceof SpawnerAgitatorBlock) {
-            if (!cachedSpawners.isEmpty()) unbindSpawner();
-            return;
-        }
-        boolean spawnerAbove = level.getBlockState(above).is(Blocks.SPAWNER);
-        if (spawnerAbove && cachedSpawners.isEmpty()) {
-            bindSpawner();
-        } else if (!spawnerAbove && !cachedSpawners.isEmpty()) {
-            unbindSpawner();
+    /**
+     * Called on each random tick. Only the topmost agitator in the column acts.
+     * Accelerates trial spawner restart: N agitators → x(N+1) cooldown speed on average.
+     * Subtracts {@code stackSize × 1365} ticks (≈ average random tick interval at default
+     * randomTickSpeed=3: 4096/3 ≈ 1365), preserving the same net speedup as a per-game-tick approach.
+     */
+    void tickTrialSpawners(ServerLevel level) {
+        if (!ColumnHelper.isTopOfColumn(level, worldPosition, null, SpawnerAgitatorBlock.class)) return;
+        if (!TrialSpawnerAccessor.isAvailable()) return;
+
+        long advance = (long) cachedStackSize * 1365L;
+        BlockPos check = worldPosition.above();
+        while (level.getBlockEntity(check) instanceof TrialSpawnerBlockEntity tsbe) {
+            if (tsbe.getTrialSpawner().getState() == TrialSpawnerState.COOLDOWN) {
+                TrialSpawnerAccessor.advanceCooldown(tsbe.getTrialSpawner().getStateData(), advance);
+            }
+            check = check.above();
         }
     }
 
@@ -199,7 +193,8 @@ public class SpawnerAgitatorBlockEntity extends BlockEntity {
                 originalStates.add(new SpawnerState(
                     data.getInt(TAG_ORIGINAL_RANGE + i).orElse(0),
                     data.getInt(TAG_ORIGINAL_MIN_DELAY + i).orElse(0),
-                    data.getInt(TAG_ORIGINAL_MAX_DELAY + i).orElse(0)
+                    data.getInt(TAG_ORIGINAL_MAX_DELAY + i).orElse(0),
+                    data.getInt(TAG_ORIGINAL_MAX_NEARBY + i).orElse(6)
                 ));
             }
         }
@@ -215,6 +210,7 @@ public class SpawnerAgitatorBlockEntity extends BlockEntity {
                 data.remove(TAG_ORIGINAL_RANGE + i);
                 data.remove(TAG_ORIGINAL_MIN_DELAY + i);
                 data.remove(TAG_ORIGINAL_MAX_DELAY + i);
+                data.remove(TAG_ORIGINAL_MAX_NEARBY + i);
             }
             data.remove(TAG_SPAWNER_COUNT);
         }
@@ -225,6 +221,7 @@ public class SpawnerAgitatorBlockEntity extends BlockEntity {
                 data.putInt(TAG_ORIGINAL_RANGE + i, state.range);
                 data.putInt(TAG_ORIGINAL_MIN_DELAY + i, state.minDelay);
                 data.putInt(TAG_ORIGINAL_MAX_DELAY + i, state.maxDelay);
+                data.putInt(TAG_ORIGINAL_MAX_NEARBY + i, state.maxNearbyEntities);
             }
         }
         setChanged();

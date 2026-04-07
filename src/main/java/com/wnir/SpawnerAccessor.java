@@ -16,12 +16,14 @@ public final class SpawnerAccessor {
     private static volatile Field rangeField;
     private static volatile Field minDelayField;
     private static volatile Field maxDelayField;
+    private static volatile Field maxNearbyEntitiesField;
     private static volatile boolean probed;
 
     static {
         rangeField = findByName("requiredPlayerRange");
         minDelayField = findByName("minSpawnDelay");
         maxDelayField = findByName("maxSpawnDelay");
+        maxNearbyEntitiesField = findByName("maxNearbyEntities");
     }
 
     private SpawnerAccessor() {}
@@ -39,6 +41,7 @@ public final class SpawnerAccessor {
         if (rangeField == null) rangeField = probeByValue(spawner, 16, "requiredPlayerRange");
         if (minDelayField == null) minDelayField = probeByValue(spawner, 200, "minSpawnDelay");
         if (maxDelayField == null) maxDelayField = probeByValue(spawner, 800, "maxSpawnDelay");
+        if (maxNearbyEntitiesField == null) maxNearbyEntitiesField = probeByValue(spawner, 6, "maxNearbyEntities");
     }
 
     public static int getRange(BaseSpawner spawner) {
@@ -63,6 +66,14 @@ public final class SpawnerAccessor {
 
     public static void setMaxDelay(BaseSpawner spawner, int value) {
         setInt(maxDelayField, spawner, value, "maxSpawnDelay");
+    }
+
+    public static int getMaxNearbyEntities(BaseSpawner spawner) {
+        return getInt(maxNearbyEntitiesField, spawner, "maxNearbyEntities");
+    }
+
+    public static void setMaxNearbyEntities(BaseSpawner spawner, int value) {
+        setInt(maxNearbyEntitiesField, spawner, value, "maxNearbyEntities");
     }
 
     public static boolean hasDelayFields() {

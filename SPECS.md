@@ -59,18 +59,19 @@ Column placed below vanilla mob spawners. Modifies all spawners above:
 
 | Event | Action |
 |-------|--------|
-| `onPlace` | `notifyColumn()` → topmost agitator calls `bindSpawner()` |
-| `playerWillDestroy` | `notifyColumnExcluding(removed)` → topmost calls `unbindSpawner()` |
-| `onLoad` (BE) | `bindSpawner()` — resolves spawners on chunk load |
-| `randomTick` | `recheckSpawners()` — periodic integrity check |
+| `onPlace` | `notifyColumn()` → full column unbind + recalcStackSize + rebind |
+| `playerWillDestroy` | `notifyColumnExcluding(removed)` → remaining column rebinds |
+| `neighborChanged` | `notifyColumn()` — reacts to spawner placed/removed above or agitator column changes |
+| `randomTick` | `notifyColumn()` + trial spawner acceleration (topmost agitator only) |
+| `onLoad` (BE) | `recalcStackSize()` + `bindSpawner()` — resolves spawners on chunk load |
+
+**Trial spawner acceleration:** on each random tick the topmost agitator subtracts `stackSize × 1365` from `cooldownEndsAt` of any `COOLDOWN` trial spawner directly above. 1365 ≈ average ticks between random ticks at default `randomTickSpeed=3` (4096/3), preserving x(N+1) average restart speed: 1 agitator = x2, 2 = x3, etc. Uses `TrialSpawnerAccessor` (reflection on `TrialSpawnerStateData.cooldownEndsAt`).
 
 **`SpawnerAccessor`:** reflection-based access to `BaseSpawner` private fields. Resolves by name first, then probes by default value (16 / 20) as fallback. Cached in `static volatile` fields.
 
 **NBT:** persists `SpawnerCount` + `OriginalRange_N`, `OriginalMinDelay_N`, `OriginalMaxDelay_N` so originals survive chunk reload.
 
 **Acquisition:** no crafting recipe — found only in dungeon loot (Overworld structures).
-
-**Known limitation:** spawner placed after agitator is only detected on chunk reload (`onLoad`). `neighborChanged` in 1.21.11 takes `Orientation` (not `BlockPos`), not currently overridden.
 
 ---
 
@@ -85,6 +86,7 @@ All post blocks share a single `WardingColumnBlockEntity`. The **bottom** block 
 | `teleporter_inhibitor` | +4 | Cancels teleports in radius |
 | `lighting_post` | +4 | Light level 15 (no active effect) |
 | `hurt_post` | +4 | Magic damage to enemies: `1♥ × hurtPostCount` every 4 ticks |
+| `silencer_post` | +4 | Attenuates entity sounds to 10% within a **sphere** of `totalRadius` |
 
 All types mix freely in one column. Column events on every block type: `onPlace` → `notifyColumn`, `playerWillDestroy` → `notifyColumnExcluding`, `randomTick` → `notifyColumn`, `onLoad` (BE) → `recalcColumn`.
 
@@ -121,6 +123,18 @@ Deals magic damage (bypasses armor) to all `Enemy` implementors in column radius
 ### Repelling Post (`wnir:repelling_post`)
 
 Adds +4 radius to the column. No active effect of its own.
+
+---
+
+### Silencer Post (`wnir:silencer_post`)
+
+Attenuates all entity sounds within the column's `totalRadius` to 10% volume. +4 radius per post.
+
+**Shape:** **sphere** — checks `dx² + dy² + dz² ≤ r²` (all three axes). Sound source Y is included in the distance test.
+
+**Mechanics:** client-side only. `SilencerHandler.onPlaySound` intercepts `PlaySoundEvent`. When the sound origin falls within any active silencer column's sphere, the sound is replaced with `DelegateSoundInstance(original, 0.1f)`. Only `silencerCount > 0` bottom-of-column blocks are checked. Uses `WardingColumnBlockEntity.silencerRegistry` (populated on both sides, read on client).
+
+**Acquisition:** loot-only (same pool as other posts).
 
 ---
 
@@ -212,7 +226,7 @@ Item that picks up any block (except bedrock/air) with full NBT, then places it 
 
 **Item name (filled):** "Wrapped \<block name\>" via `getName()` override.
 
-**Tooltip (filled):** container contents (up to 8 items) from `"Items"` list; spawner entity type from `"SpawnData" → "entity" → "id"`.
+**Tooltip (filled):** container contents (up to 8 items) from `"Items"` list; spawner entity type from `"SpawnData" → "entity" → "id"`; trial spawner mob list from `normal_config.spawn_potentials[].data.entity.id` (gray); ominous mobs in dark purple if different from normal; non-default modifiers (`mobs/wave`, `concurrent`, `interval`, `restart`) in dark aqua.
 
 **Rendering:** `BlueStickyTapeRenderer` (`SpecialModelRenderer`). Sprite priority: SOUTH face → UP face → first unculled quad → `particleIcon()`. Overlays a generated blue X cross (`DynamicTexture`, 16×16).
 
@@ -641,6 +655,19 @@ Green bundle that auto-plants seeds across adjacent farmland.
 **Recipe:** shaped — `" S " / "SBS" / " S "`, S = wheat_seeds, B = green_bundle.
 
 **Model:** reuses vanilla `minecraft:item/green_bundle` models (with open-front/back in GUI when item selected).
+
+---
+
+### Magic Cellulose Bucket (`wnir:magic_cellulose_bucket`)
+
+Bucket item for Magic Cellulose fluid. Extends `BucketItem`. `useOn()` intercepts two special targets:
+
+| Target | Action |
+|--------|--------|
+| `VaultBlock` | Clears `rewarded_players` + `state_updating_resumes_at` via NBT round-trip; reactivates block state if `INACTIVE`; consumes bucket → empty bucket |
+| `TrialSpawnerBlock` in `COOLDOWN` state | Reduces `cooldownEndsAt` by **72 000 ticks (1 hour)**; clamps to 0 (triggers instant restart on next tick); consumes bucket; `PASS` if not in COOLDOWN |
+
+Both paths play `BUCKET_EMPTY` sound on success.
 
 ---
 
