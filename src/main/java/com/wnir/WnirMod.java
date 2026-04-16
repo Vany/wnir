@@ -20,6 +20,18 @@ public class WnirMod {
     public WnirMod(IEventBus modEventBus, ModContainer modContainer) {
         WnirRegistries.register(modEventBus);
 
+        modEventBus.addListener((net.neoforged.neoforge.network.event.RegisterPayloadHandlersEvent event) -> {
+            event.registrar(MOD_ID)
+                .playToClient(
+                    TraderPayloads.TraderSyncPayload.TYPE,
+                    TraderPayloads.TraderSyncPayload.STREAM_CODEC,
+                    TraderPayloads.TraderSyncPayload::handle)
+                .playToServer(
+                    TraderPayloads.TraderActionPayload.TYPE,
+                    TraderPayloads.TraderActionPayload.STREAM_CODEC,
+                    TraderPayloads.TraderActionPayload::handle);
+        });
+
         modEventBus.addListener((RegisterCapabilitiesEvent event) -> {
             event.registerBlockEntity(
                 Capabilities.Item.BLOCK,
@@ -66,6 +78,16 @@ public class WnirMod {
                 WnirRegistries.SPAWNER_BE.get(),
                 (be, side) -> be.fluidHandler
             );
+            event.registerBlockEntity(
+                Capabilities.Fluid.BLOCK,
+                WnirRegistries.TRADER_BE.get(),
+                (be, side) -> be.fluidHandler
+            );
+            event.registerBlockEntity(
+                Capabilities.Item.BLOCK,
+                WnirRegistries.TRADER_BE.get(),
+                (be, side) -> VanillaContainerWrapper.of(be)
+            );
         });
 
         NeoForge.EVENT_BUS.addListener(MartialLightningHandler::onLivingIncomingDamage);
@@ -83,6 +105,20 @@ public class WnirMod {
         NeoForge.EVENT_BUS.addListener(WirelessFuelItem::onServerTickPre);
         NeoForge.EVENT_BUS.addListener(WirelessFuelItem::onServerTick);
         NeoForge.EVENT_BUS.addListener(WirelessFuelItem::onFurnaceFuelBurnTime);
+        NeoForge.EVENT_BUS.addListener(SilenceHandler::onVanillaGameEvent);
+        NeoForge.EVENT_BUS.addListener(SpawnerAgitatorBlockEntity::onServerTick);
+        NeoForge.EVENT_BUS.addListener((net.neoforged.neoforge.event.entity.living.FinalizeSpawnEvent e) -> {
+            var spawnerOpt = e.getSpawner();
+            if (spawnerOpt == null) return;
+            // left = BlockEntity (spawner block), right = Entity (mob summoner) — only act on spawner blocks
+            spawnerOpt.ifLeft(be -> {
+                if (be instanceof net.minecraft.world.level.block.entity.SpawnerBlockEntity
+                        && SpawnerAgitatorBlockEntity.isAgitatedSpawnerAt(be.getBlockPos())) {
+                    e.getEntity().setPersistenceRequired();
+                }
+            });
+        });
+        NeoForge.EVENT_BUS.addListener(WardingPostEnchantHandler::onEnchantItem);
         NeoForge.EVENT_BUS.addListener(
             EventPriority.LOWEST, WardingPostTeleportHandler::onEntityTeleport
         );
@@ -110,6 +146,16 @@ public class WnirMod {
                     net.minecraft.world.item.alchemy.Potions.AWKWARD,
                     net.minecraft.world.item.Items.GOLDEN_SWORD,
                     WnirRegistries.MARTIAL_LIGHTNING_POTION
+                );
+                e.getBuilder().addMix(
+                    net.minecraft.world.item.alchemy.Potions.AWKWARD,
+                    net.minecraft.world.item.Items.WHITE_WOOL,
+                    WnirRegistries.SILENCE_POTION
+                );
+                e.getBuilder().addMix(
+                    WnirRegistries.SILENCE_POTION,
+                    net.minecraft.world.item.Items.GLOWSTONE_DUST,
+                    WnirRegistries.STRONG_SILENCE_POTION
                 );
             }
         );

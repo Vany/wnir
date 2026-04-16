@@ -49,9 +49,11 @@ Force-loads its chunk permanently. Positions survive server restarts via `ChunkL
 
 ### Spawner Agitator (`wnir:spawner_agitator`)
 
-Column placed below vanilla mob spawners. Modifies all spawners above:
-- Sets `requiredPlayerRange` to `32767` (always active; not -1 to avoid blocking server shutdown save loop)
-- Scales `minSpawnDelay` and `maxSpawnDelay` down by agitator count
+Column placed below vanilla mob spawners. Keeps spawners permanently active and increases their spawn rate proportional to stack height.
+
+**Activation:** a `FakePlayer` (intangible, server-side only) is positioned at the spawner location and added to `ServerLevel.players()`. The spawner's natural `isNearPlayer()` check finds it and activates normally. No `requiredPlayerRange` modification.
+
+**Speed:** the topmost agitator calls `SpawnerBlockEntity`'s tick N extra times per natural tick (same pattern as EE Clock). N agitators → N+1 total ticks per game tick. No delay field modification.
 
 **Column layout:** `[agitators...][spawners...]` — agitators at bottom, spawners on top.
 
@@ -63,13 +65,15 @@ Column placed below vanilla mob spawners. Modifies all spawners above:
 | `playerWillDestroy` | `notifyColumnExcluding(removed)` → remaining column rebinds |
 | `neighborChanged` | `notifyColumn()` — reacts to spawner placed/removed above or agitator column changes |
 | `randomTick` | `notifyColumn()` + trial spawner acceleration (topmost agitator only) |
-| `onLoad` (BE) | `recalcStackSize()` + `bindSpawner()` — resolves spawners on chunk load |
+| `onLoad` (BE) | deferred via `PENDING_REBIND` → processed on next server tick (ensures neighbors loaded) |
+
+**FakePlayer lifecycle:** `AgitatorFakePlayer` (inner subclass of `FakePlayer`) created once per column on `bindSpawner()`, added to `serverLevel.players()` directly (bypasses `PlayerList` — only spawner detection needs it). Removed on `unbindSpawner()`. Profile: `[Agitator]` with fixed UUID.
+
+**Sleep compatibility:** `AgitatorFakePlayer` overrides `isSleeping()` and `isSleepingLongEnough()` to mirror the real-player sleeping state — returns `true` only when all real (non-fake, non-spectator) players are sleeping. This means it never blocks night-skip (it joins the sleeping count when everyone else sleeps) and never causes premature night-skip (it does not count as sleeping when nobody else is). `getSleepTimer()` returns 100 so the long-enough check always passes when sleeping. Root cause: `SleepStatus.update()` uses `isSleepingLongEnough()` which internally checks the `sleepCounter` field (incremented only by real bed entry), not `getSleepTimer()`; overriding both methods is required.
 
 **Trial spawner acceleration:** on each random tick the topmost agitator subtracts `stackSize × 1365` from `cooldownEndsAt` of any `COOLDOWN` trial spawner directly above. 1365 ≈ average ticks between random ticks at default `randomTickSpeed=3` (4096/3), preserving x(N+1) average restart speed: 1 agitator = x2, 2 = x3, etc. Uses `TrialSpawnerAccessor` (reflection on `TrialSpawnerStateData.cooldownEndsAt`).
 
-**`SpawnerAccessor`:** reflection-based access to `BaseSpawner` private fields. Resolves by name first, then probes by default value (16 / 20) as fallback. Cached in `static volatile` fields.
-
-**NBT:** persists `SpawnerCount` + `OriginalRange_N`, `OriginalMinDelay_N`, `OriginalMaxDelay_N` so originals survive chunk reload.
+**NBT:** no agitator-side state needs persisting — FakePlayer is recreated on bind; no original field values to restore.
 
 **Acquisition:** no crafting recipe — found only in dungeon loot (Overworld structures).
 
@@ -85,8 +89,9 @@ All post blocks share a single `WardingColumnBlockEntity`. The **bottom** block 
 | `repelling_post` | +4 | Adds radius only |
 | `teleporter_inhibitor` | +4 | Cancels teleports in radius |
 | `lighting_post` | +4 | Light level 15 (no active effect) |
-| `hurt_post` | +4 | Magic damage to enemies: `1♥ × hurtPostCount` every 4 ticks |
+| `hurt_post` | **+0** | Magic damage to enemies: `1♥ × hurtPostCount` every 4 ticks. No radius contribution. |
 | `silencer_post` | +4 | Attenuates entity sounds to 10% within a **sphere** of `totalRadius` |
+| `reshaper_post` | **÷2** per post | Halves total radius each post; adds +1 vertical reach up and down per post |
 
 All types mix freely in one column. Column events on every block type: `onPlace` → `notifyColumn`, `playerWillDestroy` → `notifyColumnExcluding`, `randomTick` → `notifyColumn`, `onLoad` (BE) → `recalcColumn`.
 
@@ -116,7 +121,7 @@ Light level 15. +4 radius. No active effect. Recipe: glowstone_dust × 4 + wardi
 
 ### Hurt Post (`wnir:hurt_post`)
 
-Deals magic damage (bypasses armor) to all `Enemy` implementors in column radius every 4 ticks. Damage scales with count: `2.0 × hurtPostCount` HP (i.e. 1♥ per post). +4 radius per post. Loot-only.
+Deals magic damage (bypasses armor) to all `Enemy` implementors in column radius every 4 ticks. Damage scales with count: `2.0 × hurtPostCount` HP (i.e. 1♥ per post). **Adds no radius** — damage-only post. Loot-only.
 
 ---
 
@@ -135,6 +140,18 @@ Attenuates all entity sounds within the column's `totalRadius` to 10% volume. +4
 **Mechanics:** client-side only. `SilencerHandler.onPlaySound` intercepts `PlaySoundEvent`. When the sound origin falls within any active silencer column's sphere, the sound is replaced with `DelegateSoundInstance(original, 0.1f)`. Only `silencerCount > 0` bottom-of-column blocks are checked. Uses `WardingColumnBlockEntity.silencerRegistry` (populated on both sides, read on client).
 
 **Acquisition:** loot-only (same pool as other posts).
+
+---
+
+### Reshaper Post (`wnir:reshaper_post`)
+
+Trades horizontal radius for vertical reach. Each post in the column **halves** the total radius (applied multiplicatively, N posts → `radius / 2^N`) and adds +1 to vertical range both up and down.
+
+**Radius:** applied after summing all additive contributions. Minimum clamped to 1.0.
+
+**Vertical:** `extraVertical = RESHAPER_VERTICAL_BONUS × reshaperCount` added to the base `VERTICAL_RANGE = 2.5`.
+
+**Acquisition:** loot-only. Craft: Warding Post + Obsidian.
 
 ---
 
@@ -516,7 +533,7 @@ Contains: chunk_loader, spawner_agitator, warding_post, teleporter_inhibitor, re
 8. **`event.setXpCost(int)`** on AnvilUpdateEvent — direct (not `setCost(long)` from 1.21.1).
 9. **`RegisterBrewingRecipesEvent` on `NeoForge.EVENT_BUS`** — NOT modEventBus; it is not an `IModBusEvent` in 1.21.11.
 10. **`affectNeighborsAfterRemoval` instead of `onRemove`** — `onRemove` does not exist in 1.21.11. Fires after block is removed (pos is already air). Must notify `pos` AND `pos.above()` for split-column cases.
-11. **`requiredPlayerRange = 32767` not -1** — -1 makes spawner always active but blocks server shutdown save loop (keeps generating work). 32767 is effectively infinite during gameplay but stops naturally when all players disconnect.
+11. **FakePlayer for spawner activation** — instead of setting `requiredPlayerRange` to 32767, a `FakePlayer` is added to `ServerLevel.players()` at the spawner position. Spawner activates naturally via `isNearPlayer()`. Speed boost via extra ticks (N agitators → N+1 ticks/game-tick), not delay modification. No original state to save/restore.
 12. **Event-driven spawner binding** — no per-tick polling; bind/unbind on place/destroy/load events.
 13. **Plain text file for ChunkLoaderData** — `X Y Z` per line, atomic save via tmp+rename. Avoids `SavedData` complexity and cross-version NBT API differences.
 14. **EE Clock extra-ticks approach** — calls the machine's own `BlockEntityTicker.tick()` N extra times per game tick. Works with any vanilla or modded machine without cooperation (same approach as Draconic Evolution).
@@ -580,7 +597,7 @@ Converts enchanted books (or configured extra items) + water + FE into magic cel
 **Extra item sources (`config/wnir_celluloser.toml`):**
 - Loaded once on server start via `CelluloserConfig.load()`
 - Format: `item_registry_id = xp_value` under `[sources]`
-- File created with defaults on first run: `evilcraft:origins_of_darkness = 200`, `ars_nouveau:caster_tome = 400`, `waystones:attuned_shard = 100`
+- File created with defaults on first run: `minecraft:player_head = 10000`, `evilcraft:origins_of_darkness = 200`, `ars_nouveau:caster_tome = 400`, `waystones:attuned_shard = 100`
 - Items in this map bypass the enchantment check in `canPlaceItem` — hoppers can push them in
 
 **NeoForge capabilities (registered in `WnirMod`):**
@@ -720,7 +737,137 @@ Turret block that automatically shoots arrows at hostile mobs.
 
 **GeckoLib:** `SkullBeehiveBlockEntity` implements `GeoBlockEntity`. `SkullBeehiveGeoModel` registered. Idle animation loops (`animation.skull_beehive.idle`). `RenderShape.INVISIBLE` — rendered entirely by GeckoLib. Model at `assets/wnir/geo/skull_beehive.geo.json`; animation at `assets/wnir/animations/skull_beehive.animation.json`. Shooting animation not yet defined.
 
+**Damage attribution:** `SkullBeehiveBlock.setPlacedBy()` records the placing player's UUID into `ownerUUID` (persisted in NBT as `"OwnerUUID"`). `fireArrow()` resolves the player via `level.getPlayerByUUID(ownerUUID)` and uses the player-based `Arrow`/`SpectralArrow` constructor so kill-credit, statistics, and Looting attribution all go to the original placer. Falls back to position-only constructor when the owner is offline.
+
 **Drop on break:** loot table uses `copy_components` → `block_entity_data`; all 136 slots preserved in the dropped item and restored on placement.
+
+---
+
+---
+
+### Trader (`wnir:trader`)
+
+Automated villager trade machine. Scans a 3×3 chunk area for villager traders, remembers them, and performs configured trades when triggered by redstone.
+
+**Recipe:** shaped — `"EBE" / "ECE" / "EEE"`, E = emerald, B = bell, C = chest. Category: redstone.
+
+**Properties:** inherits emerald block properties (green map color, metal sound, strength 3.0, `requiresCorrectToolForDrops()`). Listed in `minecraft:mineable/pickaxe`. Preserves full BE state on mine (copy_components on block_entity_data).
+
+---
+
+#### Cellulose tank
+
+- Capacity: 16 000 mB (`TANK_CAPACITY = 16_000`)
+- Accepts only `wnir:magic_cellulose`
+- Filled via bucket right-click OR fluid pipe (`Capabilities.Fluid.BLOCK`)
+- Exposed via `Capabilities.Fluid.BLOCK` in `WnirMod` (insert only, all faces)
+
+---
+
+#### Trader memory
+
+Traders are identified by entity UUID.
+
+| Event | Action |
+|-------|--------|
+| Rescan button pressed | Scan 3×3 chunk area (full column, all Y); for each `Villager` found, record/refresh UUID. Increment miss counter for UUIDs not seen this scan. Reset miss counter for seen UUIDs. |
+| Miss counter reaches 5 | Forget this UUID entirely (remove from remembered list + all checkbox state). |
+| UUID seen after miss > 0 | Still shown gray in GUI; reset miss counter on next successful scan. |
+
+**Persistence:** UUID list + miss counters + trade checkbox state survive chunk unload and server restart (saved in BE NBT).
+
+---
+
+#### GUI layout
+
+```
+[ Cellulose tank ] [ Trader list      ] [ Trade list (if selected) ]
+                   [ Rescan button    ]
+                   [ Give XP (N) btn  ]
+                   [ Buffer (3×3)     ]
+```
+
+| Panel | Content |
+|-------|---------|
+| Left column | Fluid tank widget (pale pink fill) |
+| Middle column | Scrollable list of remembered traders; gray tint if miss > 0; click to select |
+| "Rescan" button | Below trader list; triggers server-side scan + memory update |
+| "Give XP (N)" button | Below rescan; spawns all stored XP as orbs at player position |
+| Buffer (3×3 slots) | Built-in 9-slot inventory on the trader BE; staging area for items; NOT used for trade payments |
+| Right column | Trades for the currently selected trader |
+
+**Trade list row format:**
+
+```
+[✓] 10× [emerald] → [sword]    42 done / 3 failed
+```
+
+- Checkbox: unchecked by default; persisted per (trader UUID, trade index) in BE NBT
+- Left side: input items × count → output item (can be 2-input trades: show both inputs)
+- Right side: `N done / M failed` counters, right-aligned
+
+---
+
+#### Placement constraint
+
+Must be placed on top of a `Container` block (vanilla chest, barrel, hopper, etc.).  
+Trade cycle aborts early if `level.getBlockEntity(pos.below())` does not implement `Container`.
+
+---
+
+#### Redstone trigger (trade cycle)
+
+Fires on rising edge (`neighborChanged` detects `level.hasNeighborSignal(pos)` transitioning from false → true). Reacts to signal from any face.
+
+Resolves `Container` at `pos.below()` — aborts entire cycle if absent.
+
+For each remembered trader UUID:
+1. Resolve entity in the world — if not present, skip (do not trade, do not forget).
+2. If entity exists, iterate its `MerchantOffers`.
+3. For each offer with a checked checkbox:
+
+   **a. Restock path** — if `offer.isOutOfStock()` AND cellulose ≥ 100 mB:
+   - Drain 100 mB cellulose.
+   - Call `offer.resetUses()` on all offers (restocks the villager).
+
+   **b. Trade path** — if offer is available (not out of stock):
+   - Perform as many repetitions as possible while offer is in stock.
+   - Each repetition:
+     - Check container below has costA (and costB if present) — if not, increment `tradesFailed`, stop.
+     - Check container below has space for result — if not, stop (no fail count).
+     - Extract costA (and costB) from container below.
+     - Call `offer.increaseUses()`, add `offer.getXp()` to BE XP store.
+     - Insert result into container below.
+     - Increment `tradesDone` counter for this row.
+
+**XP accumulation:** stored in `storedXp` int. "Give XP (N)" button in GUI spawns orbs at player and resets to 0.
+
+---
+
+#### NBT schema
+
+| Key | Type | Meaning |
+|-----|------|---------|
+| `StoredXp` | `int` | Accumulated XP from trades |
+| `WasPowered` | `int` | Redstone edge detection (0/1) |
+| `Fluid` | compound | Cellulose tank (NeoForge FluidStack serialization) |
+| `Items` | list | 9-slot buffer inventory (ContainerHelper format) |
+| `TraderCount` | `int` | Number of remembered traders (in getPersistentData()) |
+| `Trader_N` | compound | Per-trader record: UUID_MSB/LSB, Miss, Checks, Done0…, Failed0… |
+
+---
+
+#### Constants
+
+| Name | Value |
+|------|-------|
+| `FORGET_THRESHOLD` | 5 |
+| `RESTOCK_COST_MB` | 100 |
+| `TANK_CAPACITY` | 16 000 |
+| `MAX_TRADERS` | 16 |
+| `MAX_TRADES` | 32 |
+| `CONTAINER_SIZE` | 9 |
+| `SCAN_CHUNK_RADIUS` | 1 (yields 3×3 chunk grid) |
 
 ---
 

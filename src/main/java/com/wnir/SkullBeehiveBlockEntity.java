@@ -181,10 +181,8 @@ public class SkullBeehiveBlockEntity extends RandomizableContainerBlockEntity im
         inventory = NonNullList.withSize(TOTAL_SLOTS, ItemStack.EMPTY);
         if (!tryLoadLootTable(input)) ContainerHelper.loadAllItems(input, inventory);
         for (int i = 0; i < WEAPON_SLOTS; i++) {
-            weaponReloadTimes[i] = input.getIntOr("Reload" + i, 0);
-            weaponExcluded[i]    = input.getIntOr("Excl" + i, 0) != 0;
+            weaponExcluded[i] = input.getIntOr("Excl" + i, 0) != 0;
         }
-        shotCooldown = input.getIntOr("ShotCooldown", 0);
         String ownerStr = input.getStringOr("OwnerUUID", "");
         ownerUUID = ownerStr.isEmpty() ? null : UUID.fromString(ownerStr);
     }
@@ -194,10 +192,8 @@ public class SkullBeehiveBlockEntity extends RandomizableContainerBlockEntity im
         super.saveAdditional(output);
         if (!trySaveLootTable(output)) ContainerHelper.saveAllItems(output, inventory, false);
         for (int i = 0; i < WEAPON_SLOTS; i++) {
-            output.putInt("Reload" + i, weaponReloadTimes[i]);
             output.putInt("Excl" + i, weaponExcluded[i] ? 1 : 0);
         }
-        output.putInt("ShotCooldown", shotCooldown);
         if (ownerUUID != null) output.putString("OwnerUUID", ownerUUID.toString());
     }
 
@@ -228,6 +224,18 @@ public class SkullBeehiveBlockEntity extends RandomizableContainerBlockEntity im
             int i = slot - WEAPON_START;
             if (stack.isEmpty() || stack.getMaxDamage() - stack.getDamageValue() > 1) {
                 weaponExcluded[i] = false;
+            }
+            // Debug: tell nearby players the reload delay for the new weapon.
+            if (!stack.isEmpty() && isWeapon(stack) && level instanceof net.minecraft.server.level.ServerLevel serverLevel) {
+                int ticks = getReloadTicks(stack);
+                net.minecraft.network.chat.Component msg = net.minecraft.network.chat.Component.literal(
+                    "[Beehive] slot " + i + " — " + stack.getHoverName().getString()
+                    + " → reload: " + ticks + " ticks");
+                for (net.minecraft.world.entity.player.Player p : serverLevel.players()) {
+                    if (p.distanceToSqr(net.minecraft.world.phys.Vec3.atCenterOf(worldPosition)) <= 32 * 32) {
+                        ((net.minecraft.server.level.ServerPlayer) p).sendSystemMessage(msg);
+                    }
+                }
             }
         }
         setChanged();
@@ -666,7 +674,11 @@ public class SkullBeehiveBlockEntity extends RandomizableContainerBlockEntity im
      * Returns true if there is no opaque block between the two points.
      */
     private static boolean hasLineOfSight(ServerLevel level, Vec3 from, Vec3 to) {
-        ClipContext ctx = new ClipContext(from, to, ClipContext.Block.COLLIDER,
+        // Push the origin 0.6 blocks toward the target so the ray starts just outside
+        // the beehive block itself — otherwise shooting downward exits through the
+        // bottom face and is immediately classified as a block hit.
+        Vec3 adjustedFrom = from.add(to.subtract(from).normalize().scale(0.6));
+        ClipContext ctx = new ClipContext(adjustedFrom, to, ClipContext.Block.COLLIDER,
             ClipContext.Fluid.NONE, CollisionContext.empty());
         HitResult result = level.clip(ctx);
         return result.getType() == HitResult.Type.MISS;

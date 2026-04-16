@@ -3,9 +3,13 @@ package com.wnir;
 import com.mojang.serialization.MapCodec;
 import net.minecraft.core.BlockPos;
 import net.minecraft.world.InteractionResult;
+import net.minecraft.world.entity.LivingEntity;
+import org.jetbrains.annotations.Nullable;
 import net.minecraft.world.entity.item.ItemEntity;
 import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.entity.projectile.arrow.AbstractArrow;
 import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.level.BlockGetter;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.BaseEntityBlock;
 import net.minecraft.world.level.block.RenderShape;
@@ -15,6 +19,10 @@ import net.minecraft.world.level.block.entity.BlockEntityType;
 import net.minecraft.world.level.block.state.BlockBehaviour;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.phys.BlockHitResult;
+import net.minecraft.world.phys.shapes.CollisionContext;
+import net.minecraft.world.phys.shapes.EntityCollisionContext;
+import net.minecraft.world.phys.shapes.Shapes;
+import net.minecraft.world.phys.shapes.VoxelShape;
 
 /**
  * Skull Beehive — a turret block that automatically shoots arrows at hostile mobs.
@@ -46,6 +54,15 @@ public class SkullBeehiveBlock extends BaseEntityBlock {
     @Override
     public RenderShape getRenderShape(BlockState state) { return RenderShape.INVISIBLE; }
 
+    /** Arrows pass through the beehive — mobs and players still collide normally. */
+    @Override
+    public VoxelShape getCollisionShape(BlockState state, BlockGetter level, BlockPos pos, CollisionContext ctx) {
+        if (ctx instanceof EntityCollisionContext ecc && ecc.getEntity() instanceof AbstractArrow) {
+            return Shapes.empty();
+        }
+        return super.getCollisionShape(state, level, pos, ctx);
+    }
+
     @Override
     public BlockEntity newBlockEntity(BlockPos pos, BlockState state) {
         return new SkullBeehiveBlockEntity(pos, state);
@@ -58,6 +75,19 @@ public class SkullBeehiveBlock extends BaseEntityBlock {
         return level.isClientSide() ? null
             : createTickerHelper(type, WnirRegistries.SKULL_BEEHIVE_BE.get(),
                 SkullBeehiveBlockEntity::serverTick);
+    }
+
+    /** Record the placing player's UUID so arrows are attributed to them for kill-credit. */
+    @Override
+    public void setPlacedBy(
+        Level level, BlockPos pos, BlockState state,
+        @Nullable LivingEntity placer, ItemStack stack
+    ) {
+        super.setPlacedBy(level, pos, state, placer, stack);
+        if (!level.isClientSide() && placer instanceof Player player
+            && level.getBlockEntity(pos) instanceof SkullBeehiveBlockEntity be) {
+            be.setOwnerUUID(player.getUUID());
+        }
     }
 
     /**

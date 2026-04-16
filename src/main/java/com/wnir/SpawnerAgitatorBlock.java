@@ -90,10 +90,7 @@ public class SpawnerAgitatorBlock extends BaseEntityBlock {
         Player player
     ) {
         if (!level.isClientSide()) {
-            if (
-                level.getBlockEntity(pos) instanceof
-                    SpawnerAgitatorBlockEntity be
-            ) {
+            if (level.getBlockEntity(pos) instanceof SpawnerAgitatorBlockEntity be) {
                 be.unbindSpawner();
             }
             notifyColumnExcluding(level, pos);
