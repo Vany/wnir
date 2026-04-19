@@ -184,12 +184,10 @@ Item sorter hopper. Extends `HopperBlock` / `RandomizableContainerBlockEntity`.
 
 **Slots:** 10 (two rows of 5). GUI opens on right-click.
 
-**Transfer logic (every 8 ticks):**
-- Pull from above via `HopperBlockEntity.suckInItems()`
-- Push 2 items per cycle into the block in its facing direction
-- **Never ejects the last item in a stack** — only pushes from slots where `count > 1`
-- If only one eligible slot, both transfers come from it
-- Slot selection is random among eligible slots each transfer
+**Transfer logic (every 16 ticks):**
+- For each of the 10 slots: pull up to 4 items from the source above into that slot
+- For each of the 10 slots: push up to 4 items from that slot into the target in the facing direction
+- **Never ejects the last item in a slot** — only pushes from slots where `count > 1`
 - Uses `Capabilities.Item.BLOCK` for ejection — works with vanilla and modded inventories
 
 **GUI:**
@@ -619,10 +617,10 @@ High-throughput version of the Mossy Hopper. Renders as iron.
 
 **Slots:** 10 (two rows of 5). GUI opens on right-click.
 
-**Transfer logic (every 8 ticks):**
-- Pull from above via `HopperBlockEntity.suckInItems()`
-- Push up to 8 items from a single slot per cycle (fills existing stacks first via `ResourceHandlerUtil.insertStacking`)
-- No slot-lock restriction (unlike Mossy Hopper — all slots eligible)
+**Transfer logic (every 16 ticks, 4 iterations per cycle):**
+- Runs the full per-slot transfer logic 4 times per cycle
+- Each iteration: for each of the 10 slots: pull up to 4 items from source above, push up to 4 items to target
+- No last-item restriction — all slots eligible regardless of count
 - Uses `Capabilities.Item.BLOCK` for ejection — works with vanilla and modded inventories
 
 **GUI:** `WnirHopperMenu` (variant: `steel`) + `WnirHopperScreen` (factory: `"steel_hopper"`) — identical layout to Mossy Hopper.
@@ -637,15 +635,13 @@ Regulator hopper. Fills a target inventory with exactly one of each item type. R
 
 **Slots:** 10 (two rows of 5). GUI opens on right-click.
 
-**Transfer logic (every 8 ticks):**
-- Pull from above via `HopperBlockEntity.suckInItems()`
-- Eject: count occupied slots in target = N; pull from hopper slot N; regulator check; push 1 item to first accepting empty target slot
-- **Regulator rule:** if target already contains the item type from hopper slot N, skip — nothing is inserted
-- This ensures at most one of each item type ends up in the target
+**Transfer logic (every 16 ticks):**
+- For each of the 10 slots N (0–9): pull up to 4 items **from slot N of the source above** into hopper slot N
+- For each of the 10 slots N (0–9): push up to 4 items from hopper slot N **into slot N of the target**
+- **Never ejects the last item in a slot** — only pushes from slots where `count > 1`
+- **Strict slot mapping:** slot N always reads from source slot N and writes to target slot N — no cross-slot movement
 
-**Eject path decision:**
-1. If target block entity implements `Container` → slot-count-mapped path (`countOccupied` via `Container.getItem`)
-2. Else → capability fallback via `Capabilities.Item.BLOCK`: iterates hopper slots in order, skips any item already in target (check via aborted-transaction extract), inserts the first eligible item
+**Eject path:** `Capabilities.Item.BLOCK` with direct slot-indexed access; falls back to `Container` interface for slot-indexed reads/writes.
 
 **GUI:** `WnirHopperMenu` (variant: `nether`) + `WnirHopperScreen` (factory: `"nether_hopper"`) — identical layout to Mossy/Steel Hopper. Texture: `nether_hopper.png` (placeholder copy of mossy_hopper.png; needs netherrack-themed art).
 

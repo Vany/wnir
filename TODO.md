@@ -1,5 +1,11 @@
 # Ideas to implement later
 
+## BUGS
+
+- ~~crash when open celluloser interface.~~ FIXED — TraderScreen was calling villager.getOffers() on the client; now synced via TraderSyncPayload
+- check cherepuly timings.
+- silencer must silence music
+
 ## Refactoring (copypaste reduction)
 
 - [x] **R7** `DelegateSoundInstance` replaces `QuietSoundInstance` + `SilentSoundInstance`

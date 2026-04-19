@@ -8,16 +8,15 @@ import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.state.BlockState;
 import net.neoforged.neoforge.capabilities.Capabilities;
-import net.neoforged.neoforge.transfer.ResourceHandler;
 import net.neoforged.neoforge.transfer.ResourceHandlerUtil;
 import net.neoforged.neoforge.transfer.item.ItemResource;
 import net.neoforged.neoforge.transfer.transaction.Transaction;
 
 /**
- * Mossy Hopper block entity.
+ * Mossy Hopper — item sorter.
  *
- * Transfer: every 8 ticks, eject 1 item from each of 2 randomly chosen eligible slots
- * (slots with count > 1). Never ejects the last item from any slot.
+ * Every 16 ticks: pull up to 4 items per slot from above, push up to 4 items per slot to target.
+ * Never ejects the last item from any slot (count must be > 1 to push).
  */
 public class MossyHopperBlockEntity extends AbstractWnirHopperBlockEntity {
 
@@ -39,47 +38,27 @@ public class MossyHopperBlockEntity extends AbstractWnirHopperBlockEntity {
         tick(level, pos, state, be);
     }
 
-    // ── Eject ─────────────────────────────────────────────────────────────
-
     @Override
-    protected boolean tryEject(Level level, BlockPos pos, BlockPos targetPos) {
-        ResourceHandler<ItemResource> dest = level.getCapability(
-            Capabilities.Item.BLOCK, targetPos, facing.getOpposite());
-        return dest != null && ejectTwoItems(level, this, dest);
-    }
+    protected boolean doCycle(Level level, BlockPos pos) {
+        boolean moved = pullAll(level, pos);
 
-    /**
-     * Transfers up to 2 items from eligible slots (count > 1) to {@code dest}.
-     * Re-evaluates eligibility before each transfer so a slot reduced to count=1
-     * isn't transferred again.
-     */
-    private static boolean ejectTwoItems(Level level, MossyHopperBlockEntity be,
-                                         ResourceHandler<ItemResource> dest) {
-        boolean moved = false;
-        for (int transfer = 0; transfer < 2; transfer++) {
-            int eligibleCount = 0;
-            for (ItemStack s : be.items) if (s.getCount() > 1) eligibleCount++;
-            if (eligibleCount == 0) break;
-
-            int pick = level.random.nextInt(eligibleCount);
-            int slot = -1;
-            for (int i = 0; i < SIZE; i++) {
-                if (be.items.get(i).getCount() > 1 && pick-- == 0) { slot = i; break; }
-            }
-            if (slot < 0) break;
-
-            ItemResource resource = ItemResource.of(be.items.get(slot));
-            try (var tx = Transaction.openRoot()) {
-                int inserted = ResourceHandlerUtil.insertStacking(dest, resource, 1, tx);
-                if (inserted > 0) {
-                    tx.commit();
-                    be.removeItem(slot, inserted);
-                    moved = true;
-                } else {
-                    break;
+        var dest = level.getCapability(Capabilities.Item.BLOCK, pos.relative(facing), facing.getOpposite());
+        if (dest != null) {
+            for (int slot = 0; slot < SIZE; slot++) {
+                ItemStack stack = items.get(slot);
+                if (stack.getCount() <= 1) continue;
+                int toEject = Math.min(stack.getCount() - 1, PER_SLOT);
+                try (var tx = Transaction.openRoot()) {
+                    int inserted = ResourceHandlerUtil.insertStacking(dest, ItemResource.of(stack), toEject, tx);
+                    if (inserted > 0) {
+                        tx.commit();
+                        removeItem(slot, inserted);
+                        moved = true;
+                    }
                 }
             }
         }
+
         return moved;
     }
 }

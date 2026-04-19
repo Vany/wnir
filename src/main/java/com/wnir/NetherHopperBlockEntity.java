@@ -1,27 +1,23 @@
 package com.wnir;
 
 import net.minecraft.core.BlockPos;
+import net.minecraft.core.Direction;
 import net.minecraft.network.chat.Component;
 import net.minecraft.world.Container;
+import net.minecraft.world.WorldlyContainer;
 import net.minecraft.world.entity.player.Inventory;
 import net.minecraft.world.inventory.AbstractContainerMenu;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.state.BlockState;
-import net.neoforged.neoforge.capabilities.Capabilities;
-import net.neoforged.neoforge.transfer.ResourceHandler;
-import net.neoforged.neoforge.transfer.ResourceHandlerUtil;
-import net.neoforged.neoforge.transfer.item.ItemResource;
-import net.neoforged.neoforge.transfer.transaction.Transaction;
 
 /**
- * Nether Hopper block entity — regulator hopper.
+ * Nether Hopper — slot-mapped regulator.
  *
- * Regulator rule: count occupied target slots (= N), pull from hopper slot N,
- * skip if target already contains that item type. Inserts 1 item per cycle.
- *
- * Dual eject path: Container (slot-count-mapped) + Capabilities.Item.BLOCK fallback.
- * Never nests Transaction.openRoot() — check tx must be closed before insert tx.
+ * Every 16 ticks: hopper slot N pulls from source slot N, pushes to target slot N.
+ * Never ejects the last item from any slot (count must be > 1 to push).
+ * Requires Container on both source and target; no capability fallback (slot indexing
+ * is the core feature and cannot be emulated without indexed access).
  */
 public class NetherHopperBlockEntity extends AbstractWnirHopperBlockEntity {
 
@@ -43,96 +39,76 @@ public class NetherHopperBlockEntity extends AbstractWnirHopperBlockEntity {
         tick(level, pos, state, be);
     }
 
-    // ── Eject ─────────────────────────────────────────────────────────────
-
     @Override
-    protected boolean tryEject(Level level, BlockPos pos, BlockPos targetPos) {
-        var targetBe = level.getBlockEntity(targetPos);
+    protected boolean doCycle(Level level, BlockPos pos) {
+        boolean moved = false;
+
+        // Pull: hopper slot N ← source slot N
+        var sourceBe = level.getBlockEntity(pos.above());
+        if (sourceBe instanceof Container source) {
+            int limit = Math.min(SIZE, source.getContainerSize());
+            for (int slot = 0; slot < limit; slot++) {
+                ItemStack src = source.getItem(slot);
+                if (src.isEmpty()) continue;
+                if (source instanceof WorldlyContainer wc && !wc.canTakeItemThroughFace(slot, src, Direction.DOWN)) continue;
+
+                ItemStack current = items.get(slot);
+                if (!current.isEmpty() && !ItemStack.isSameItemSameComponents(current, src)) continue;
+
+                int canAccept = current.isEmpty()
+                    ? src.getMaxStackSize()
+                    : current.getMaxStackSize() - current.getCount();
+                if (canAccept <= 0) continue;
+
+                int amount = Math.min(Math.min(src.getCount(), canAccept), PER_SLOT);
+                source.removeItem(slot, amount);
+                if (current.isEmpty()) {
+                    items.set(slot, src.copyWithCount(amount));
+                } else {
+                    current.grow(amount);
+                }
+                moved = true;
+            }
+            if (moved) source.setChanged();
+        }
+
+        // Push: hopper slot N → target slot N, never last item
+        var targetBe = level.getBlockEntity(pos.relative(facing));
         if (targetBe instanceof Container target) {
-            return ejectSlotMapped(this, target);
-        }
-        ResourceHandler<ItemResource> cap = level.getCapability(
-            Capabilities.Item.BLOCK, targetPos, facing.getOpposite());
-        return cap != null && ejectCapability(this, cap);
-    }
+            boolean pushed = false;
+            int limit = Math.min(SIZE, target.getContainerSize());
+            Direction inFace = facing.getOpposite();
+            for (int slot = 0; slot < limit; slot++) {
+                ItemStack stack = items.get(slot);
+                if (stack.getCount() <= 1) continue;
+                if (!target.canPlaceItem(slot, stack)) continue;
+                if (target instanceof WorldlyContainer wt && !wt.canPlaceItemThroughFace(slot, stack, inFace)) continue;
 
-    /**
-     * Fill-count regulator eject for Container targets.
-     *
-     * Strategy: count how many non-empty slots the target currently has (= N).
-     * Pull from hopper slot N. Skip if hopper slot N is empty or target already
-     * contains that item type. Inserts into first accepting empty target slot.
-     */
-    private static boolean ejectSlotMapped(NetherHopperBlockEntity be, Container target) {
-        int n = countOccupied(target);
-        if (n >= SIZE) return false;
+                ItemStack targetStack = target.getItem(slot);
+                if (!targetStack.isEmpty() && !ItemStack.isSameItemSameComponents(targetStack, stack)) continue;
 
-        ItemStack hopperStack = be.items.get(n);
-        if (hopperStack.isEmpty()) return false;
-        if (containerHasItem(target, hopperStack)) return false;
+                int canAccept = targetStack.isEmpty()
+                    ? stack.getMaxStackSize()
+                    : stack.getMaxStackSize() - targetStack.getCount();
+                if (canAccept <= 0) continue;
 
-        for (int i = 0; i < target.getContainerSize(); i++) {
-            if (!target.getItem(i).isEmpty()) continue;
-            if (!target.canPlaceItem(i, hopperStack)) continue;
-            target.setItem(i, hopperStack.copyWithCount(1));
-            be.removeItem(n, 1);
-            target.setChanged();
-            return true;
-        }
-        return false;
-    }
+                int amount = Math.min(Math.min(stack.getCount() - 1, canAccept), PER_SLOT);
+                if (amount <= 0) continue;
 
-    private static int countOccupied(Container target) {
-        int count = 0;
-        for (int i = 0; i < target.getContainerSize(); i++) {
-            if (!target.getItem(i).isEmpty()) count++;
-        }
-        return count;
-    }
-
-    private static boolean containerHasItem(Container target, ItemStack stack) {
-        for (int i = 0; i < target.getContainerSize(); i++) {
-            if (ItemStack.isSameItemSameComponents(target.getItem(i), stack)) return true;
-        }
-        return false;
-    }
-
-    /**
-     * Capability-based regulator eject for modded inventories that don't implement Container.
-     *
-     * Mirrors the Container path: determine N by counting how many consecutive hopper items
-     * (starting from slot 0) are already present in the target. Stops at the first empty
-     * hopper slot, then inserts from slot N.
-     */
-    private static boolean ejectCapability(NetherHopperBlockEntity be,
-                                           ResourceHandler<ItemResource> dest) {
-        int n = 0;
-        for (int i = 0; i < SIZE; i++) {
-            ItemStack s = be.items.get(i);
-            if (s.isEmpty()) break;
-            long found;
-            try (var checkTx = Transaction.openRoot()) {
-                found = dest.extract(ItemResource.of(s), 1, checkTx);
-            } // aborts on close — nothing extracted
-            if (found > 0) {
-                n = i + 1;
-            } else {
-                break;
+                if (targetStack.isEmpty()) {
+                    target.setItem(slot, stack.copyWithCount(amount));
+                } else {
+                    targetStack.grow(amount);
+                }
+                removeItem(slot, amount);
+                pushed = true;
+            }
+            if (pushed) {
+                target.setChanged();
+                moved = true;
             }
         }
 
-        if (n >= SIZE) return false;
-        ItemStack stack = be.items.get(n);
-        if (stack.isEmpty()) return false;
-
-        try (var tx = Transaction.openRoot()) {
-            int inserted = ResourceHandlerUtil.insertStacking(dest, ItemResource.of(stack), 1, tx);
-            if (inserted > 0) {
-                tx.commit();
-                be.removeItem(n, inserted);
-                return true;
-            }
-        }
-        return false;
+        return moved;
     }
 }
