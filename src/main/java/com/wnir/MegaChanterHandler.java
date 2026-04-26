@@ -139,7 +139,6 @@ public final class MegaChanterHandler {
                 anyIncompatible = true;
             } else {
                 anyCompatible = true;
-                newLevel = Math.min(newLevel, holder.value().getMaxLevel());
                 enchantments.set(holder, newLevel);
                 int anvilCost = holder.value().getAnvilCost();
                 if (isBook) anvilCost = Math.max(1, anvilCost / 2);

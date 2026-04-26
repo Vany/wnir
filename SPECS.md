@@ -394,7 +394,7 @@ Replaces bow arrows with homing `ShulkerBullet`.
 
 ### Mega Chanter (`wnir:mega_chanter`) — `#00FF99`
 
-Bypasses the vanilla "Too Expensive" (cost ≥ 40) anvil cap. Recomputes the anvil operation from scratch whenever the event fires, identical to vanilla logic but caps display at 39 XP levels instead of blocking the result.
+Bypasses the vanilla "Too Expensive" (cost ≥ 40) anvil cap and the per-enchantment max-level cap. Recomputes the anvil operation from scratch whenever the event fires, identical to vanilla logic but caps display at 39 XP levels instead of blocking the result. Enchantment levels from books are applied as-is (e.g. Looting X from a book → Looting X on the item).
 
 **Handler:** `MegaChanterHandler::onAnvilUpdate`
 
