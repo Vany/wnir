@@ -1,8 +1,8 @@
 package com.wnir;
 
 import net.minecraft.resources.Identifier;
-import software.bernie.geckolib.model.GeoModel;
-import software.bernie.geckolib.renderer.base.GeoRenderState;
+import com.geckolib.model.GeoModel;
+import com.geckolib.renderer.base.GeoRenderState;
 
 public class SkullBeehiveGeoModel extends GeoModel<SkullBeehiveBlockEntity> {
 

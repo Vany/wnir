@@ -40,7 +40,7 @@ public class ChunkLoaderBlock extends Block {
     }
 
     static void forceChunk(ServerLevel level, BlockPos pos, boolean add) {
-        ChunkPos chunkPos = new ChunkPos(pos);
-        level.setChunkForced(chunkPos.x, chunkPos.z, add);
+        ChunkPos chunkPos = new ChunkPos(pos.getX() >> 4, pos.getZ() >> 4);
+        level.setChunkForced(chunkPos.x(), chunkPos.z(), add);
     }
 }

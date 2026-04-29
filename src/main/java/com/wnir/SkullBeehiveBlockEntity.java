@@ -36,12 +36,12 @@ import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.HitResult;
 import net.minecraft.world.phys.Vec3;
 import org.jetbrains.annotations.Nullable;
-import software.bernie.geckolib.animatable.GeoBlockEntity;
-import software.bernie.geckolib.animatable.instance.AnimatableInstanceCache;
-import software.bernie.geckolib.animatable.manager.AnimatableManager;
-import software.bernie.geckolib.animation.AnimationController;
-import software.bernie.geckolib.animation.RawAnimation;
-import software.bernie.geckolib.util.GeckoLibUtil;
+import com.geckolib.animatable.GeoBlockEntity;
+import com.geckolib.animatable.instance.AnimatableInstanceCache;
+import com.geckolib.animatable.manager.AnimatableManager;
+import com.geckolib.animation.AnimationController;
+import com.geckolib.animation.RawAnimation;
+import com.geckolib.util.GeckoLibUtil;
 
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -508,7 +508,7 @@ public class SkullBeehiveBlockEntity extends RandomizableContainerBlockEntity im
             if (!inventory.get(i).isEmpty()) slots.add(i);
         }
         if (slots.isEmpty()) return ItemStack.EMPTY;
-        int idx   = level.random.nextInt(slots.size());
+        int idx   = level.getRandom().nextInt(slots.size());
         int slot  = slots.get(idx);
         ItemStack s    = inventory.get(slot);
         ItemStack taken = s.copyWithCount(1);

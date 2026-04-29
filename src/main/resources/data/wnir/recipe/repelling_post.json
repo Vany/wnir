@@ -1,0 +1,12 @@
+{
+  "type": "minecraft:crafting_shapeless",
+  "category": "misc",
+  "ingredients": [
+    "wnir:warding_post",
+    "minecraft:feather"
+  ],
+  "result": {
+    "id": "wnir:repelling_post",
+    "count": 1
+  }
+}

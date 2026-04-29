@@ -17,6 +17,7 @@ import net.minecraft.world.entity.SlotAccess;
 import net.minecraft.world.item.BundleItem;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.ItemStackTemplate;
 import net.minecraft.world.item.TooltipFlag;
 import net.minecraft.world.item.component.BundleContents;
 import net.minecraft.world.item.component.TooltipDisplay;
@@ -139,7 +140,7 @@ public class SeedBundleItem extends BundleItem {
     /** Returns true if the block at pos is plantable soil (farmland or soul sand for nether wart). */
     static boolean isPlantableSoil(Level level, BlockPos pos) {
         net.minecraft.world.level.block.Block b = level.getBlockState(pos).getBlock();
-        return b instanceof net.minecraft.world.level.block.FarmBlock
+        return b instanceof net.minecraft.world.level.block.FarmlandBlock
             || b == net.minecraft.world.level.block.Blocks.SOUL_SAND;
     }
 
@@ -156,20 +157,20 @@ public class SeedBundleItem extends BundleItem {
         if (!BundleContents.canItemBeInBundle(incoming) || incoming.isEmpty()) return false;
         if (!isPlantable(incoming)) return false;
 
-        List<ItemStack> items = new ArrayList<>();
-        for (ItemStack s : contents.items()) items.add(s.copy());
+        List<ItemStackTemplate> items = new ArrayList<>(contents.items());
 
         int inserted = 0;
         boolean merged = false;
 
         // Merge with existing matching stack up to maxStackSize
         for (int i = 0; i < items.size(); i++) {
-            ItemStack existing = items.get(i);
-            if (ItemStack.isSameItemSameComponents(existing, incoming)) {
-                int space = existing.getMaxStackSize() - existing.getCount();
+            ItemStackTemplate existing = items.get(i);
+            ItemStack existingStack = existing.create();
+            if (ItemStack.isSameItemSameComponents(existingStack, incoming)) {
+                int space = existingStack.getMaxStackSize() - existing.count();
                 int add = Math.min(space, incoming.getCount());
                 if (add > 0) {
-                    items.set(i, existing.copyWithCount(existing.getCount() + add));
+                    items.set(i, existing.withCount(existing.count() + add));
                     items.add(0, items.remove(i)); // move to front
                     incoming.shrink(add);
                     inserted += add;
@@ -182,7 +183,7 @@ public class SeedBundleItem extends BundleItem {
         // New type: add a new stack if under the type limit
         if (!merged && items.size() < MAX_STACKS && !incoming.isEmpty()) {
             int add = Math.min(incoming.getMaxStackSize(), incoming.getCount());
-            items.add(0, incoming.split(add));
+            items.add(0, ItemStackTemplate.fromNonEmptyStack(incoming.split(add)));
             inserted += add;
         }
 
@@ -197,13 +198,11 @@ public class SeedBundleItem extends BundleItem {
     private static ItemStack removeOne(ItemStack bundleStack, BundleContents contents) {
         if (contents.isEmpty()) return null;
 
-        int idx = contents.getSelectedItem();
+        int idx = contents.getSelectedItemIndex();
         if (idx < 0 || idx >= contents.size()) idx = 0;
 
-        List<ItemStack> items = new ArrayList<>();
-        for (ItemStack s : contents.items()) items.add(s.copy());
-
-        ItemStack removed = items.remove(idx);
+        List<ItemStackTemplate> items = new ArrayList<>(contents.items());
+        ItemStack removed = items.remove(idx).create();
         bundleStack.set(DataComponents.BUNDLE_CONTENTS, new BundleContents(items));
         return removed;
     }
@@ -306,13 +305,14 @@ public class SeedBundleItem extends BundleItem {
             Vec3.atCenterOf(surface.above()), Direction.UP, surface, false
         );
 
-        for (ItemStack seed : contents.items()) {
-            if (seed.isEmpty()) continue;
+        for (ItemStackTemplate seed : contents.items()) {
+            if (seed.count() == 0) continue;
 
             // Pass a copy so the seed's useOn() can shrink it freely
-            ItemStack testCopy = seed.copyWithCount(1);
+            ItemStack seedStack = seed.create();
+            ItemStack testCopy = seedStack.copyWithCount(1);
             UseOnContext plantCtx = new UseOnContext(level, player, InteractionHand.MAIN_HAND, testCopy, hit);
-            InteractionResult result = seed.getItem().useOn(plantCtx);
+            InteractionResult result = seedStack.getItem().useOn(plantCtx);
 
             if (result.consumesAction()) {
                 // Planted successfully — remove one of this seed from the bundle
@@ -324,17 +324,17 @@ public class SeedBundleItem extends BundleItem {
     }
 
     /** Removes exactly one item from the stack in the bundle that matches {@code seed}. */
-    private static void removeSeedFromBundle(ItemStack bundleStack, ItemStack seed) {
+    private static void removeSeedFromBundle(ItemStack bundleStack, ItemStackTemplate seed) {
         BundleContents contents = bundleStack.getOrDefault(DataComponents.BUNDLE_CONTENTS, BundleContents.EMPTY);
-        List<ItemStack> newItems = new ArrayList<>();
+        List<ItemStackTemplate> newItems = new ArrayList<>();
         boolean removed = false;
-        for (ItemStack s : contents.items()) {
-            if (!removed && ItemStack.isSameItemSameComponents(s, seed)) {
-                if (s.getCount() > 1) newItems.add(s.copyWithCount(s.getCount() - 1));
+        for (ItemStackTemplate s : contents.items()) {
+            if (!removed && ItemStack.isSameItemSameComponents(s.create(), seed.create())) {
+                if (s.count() > 1) newItems.add(s.withCount(s.count() - 1));
                 // count==1: don't add (removes the stack entirely)
                 removed = true;
             } else {
-                newItems.add(s.copy());
+                newItems.add(s);
             }
         }
         bundleStack.set(DataComponents.BUNDLE_CONTENTS, new BundleContents(newItems));

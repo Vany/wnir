@@ -31,8 +31,9 @@ import net.minecraft.world.phys.Vec3;
  *   - WardingPostBlock:         +6 (radius only)
  *   - RepellingPostBlock:       +4 (radius + mob push)
  *   - TeleporterInhibitorBlock: +4 (radius + teleport block)
- *   - HurtPostBlock:            +4 (radius + 1-heart armor-bypassing damage every 4 ticks)
+ *   - HurtPostBlock:            +0 (no radius — damage only: 1-heart armor-bypassing damage every 4 ticks)
  *   - LightingPostBlock:        +4 (radius + light level 15)
+ *   - ReshaperPostBlock:        ÷2 per post (halves radius, +1 vertical per post)
  */
 public class WardingColumnBlockEntity extends BlockEntity {
 
@@ -48,15 +49,11 @@ public class WardingColumnBlockEntity extends BlockEntity {
     static final double REPELLING_RADIUS = 4.0;
     /** Contribution per TeleporterInhibitorBlock in column. */
     static final double INHIBITOR_RADIUS = 4.0;
-    /** Contribution per HurtPostBlock in column. */
-    static final double HURT_RADIUS = 4.0;
-    /** Damage per tick cycle: 2.0 = 1 heart, bypasses armor via magic damage source. */
+    /** Damage per tick cycle: 2.0 = 1 heart, bypasses armor via magic damage source. HurtPostBlock adds NO radius. */
     private static final float HURT_DAMAGE = 2.0f;
     /** Contribution per SilencerPostBlock in column. */
     static final double SILENCER_RADIUS = 4.0;
-    /** Horizontal radius reduction per ReshaperPostBlock. */
-    static final double RESHAPER_RADIUS_REDUCTION = 2.0;
-    /** Vertical range bonus (up AND down) per ReshaperPostBlock. */
+    /** Vertical range bonus (up AND down) per ReshaperPostBlock. Radius halving is applied N times in recalcColumn(). */
     static final double RESHAPER_VERTICAL_BONUS = 1.0;
 
     // ── Column state (valid only when isBottomOfColumn) ──────────────────
@@ -157,7 +154,7 @@ public class WardingColumnBlockEntity extends BlockEntity {
         );
 
         if (be.hasRepel) {
-            for (Mob mob : level.getEntitiesOfClass(Mob.class, area, Mob::isAggressive)) {
+            for (Mob mob : level.getEntitiesOfClass(Mob.class, area, m -> m instanceof Enemy || m.isAggressive())) {
                 Vec3 dir = mob.position().subtract(center);
                 double dist = dir.horizontalDistance();
                 if (dist < CENTER_EPSILON) { dir = new Vec3(1, 0, 0); dist = 1; }
@@ -215,14 +212,15 @@ public class WardingColumnBlockEntity extends BlockEntity {
             level, worldPosition, exclude, WardingColumnBlock.class, ReshaperPostBlock.class
         );
 
+        // HurtPostBlock contributes NO radius — damage only.
+        // ReshaperPostBlock halves the radius once per post (applied N times).
         double rawRadius = WARDING_RADIUS * wardingCount
                          + REPELLING_RADIUS * repelCount
                          + INHIBITOR_RADIUS * inhibitCount
-                         + HURT_RADIUS * hurtCount
-                         + SILENCER_RADIUS * silencerCount
-                         - RESHAPER_RADIUS_REDUCTION * reshaperCount;
+                         + SILENCER_RADIUS * silencerCount;
+        for (int i = 0; i < reshaperCount; i++) rawRadius /= 2.0;
         totalRadius        = Math.max(1.0, rawRadius);
-        hasRepel           = repelCount > 0;
+        hasRepel           = repelCount > 0;  // RepellingPostBlock drives the push; WardingPost adds radius only
         hasInhibit         = inhibitCount > 0;
         hurtPostCount      = hurtCount;
         this.silencerCount = silencerCount;
@@ -268,7 +266,9 @@ public class WardingColumnBlockEntity extends BlockEntity {
     @Override
     public void onLoad() {
         super.onLoad();
-        recalcColumn();
+        // Notify the whole column so every BE (including those above/below) gets correct state.
+        // recalcColumn() alone only updates self; WardingColumnBaseBlock.notifyColumn walks all BEs.
+        WardingColumnBaseBlock.notifyColumn(level, worldPosition);
     }
 
     @Override

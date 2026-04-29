@@ -8,7 +8,7 @@ import net.minecraft.world.level.block.entity.BlockEntityType;
 import net.minecraft.world.level.block.state.BlockBehaviour;
 import net.minecraft.world.level.block.state.BlockState;
 
-/** Warding Post: contributes +6 to column radius. No push, no teleport inhibition. */
+/** Warding Post: contributes +6 to column radius only. No active effect. */
 public class WardingPostBlock extends WardingColumnBaseBlock {
 
     private static final MapCodec<WardingPostBlock> CODEC = simpleCodec(WardingPostBlock::new);

@@ -1,11 +1,13 @@
 package com.wnir;
 
-import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.gui.screens.inventory.AbstractContainerScreen;
 import net.minecraft.client.renderer.RenderPipelines;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.Identifier;
 import net.minecraft.world.entity.player.Inventory;
+
+import java.util.Optional;
 
 /**
  * Celluloser GUI (176×166).
@@ -42,16 +44,14 @@ public class CelluloserScreen extends AbstractContainerScreen<CelluloserMenu> {
     private static final int ARR_X = 101, ARR_Y = 38; // progress arrow
 
     public CelluloserScreen(CelluloserMenu menu, Inventory playerInv, Component title) {
-        super(menu, playerInv, title);
-        this.imageWidth  = 176;
-        this.imageHeight = 166;
+        super(menu, playerInv, title, 176, 166);
         this.titleLabelX = 8;
         this.titleLabelY = 4;
         this.inventoryLabelY = this.imageHeight + 10;  // push off-screen — no "Inventory" label
     }
 
     @Override
-    protected void renderBg(GuiGraphics g, float partialTick, int mouseX, int mouseY) {
+    public void extractContents(GuiGraphicsExtractor g, int mouseX, int mouseY, float partialTick) {
         // Background
         g.blit(RenderPipelines.GUI_TEXTURED, BG,
             leftPos, topPos, 0f, 0f, imageWidth, imageHeight, 256, 256);
@@ -104,40 +104,40 @@ public class CelluloserScreen extends AbstractContainerScreen<CelluloserMenu> {
     }
 
     @Override
-    protected void renderLabels(GuiGraphics g, int mouseX, int mouseY) {
-        super.renderLabels(g, mouseX, mouseY);
+    protected void extractLabels(GuiGraphicsExtractor g, int mouseX, int mouseY) {
+        super.extractLabels(g, mouseX, mouseY);
     }
 
     @Override
-    public void render(GuiGraphics g, int mouseX, int mouseY, float partialTick) {
-        super.render(g, mouseX, mouseY, partialTick);
-        renderTooltip(g, mouseX, mouseY);
+    public void extractRenderState(GuiGraphicsExtractor g, int mouseX, int mouseY, float partialTick) {
+        super.extractRenderState(g, mouseX, mouseY, partialTick);
+        extractTooltip(g, mouseX, mouseY);
 
         int rx = mouseX - leftPos, ry = mouseY - topPos;
 
         // Energy bar tooltip
         if (rx >= 8 && rx <= 23 && ry >= 13 && ry <= 69) {
             int energy = menu.getEnergy();
-            g.setComponentTooltipForNextFrame(font, java.util.List.of(
+            g.setTooltipForNextFrame(font, java.util.List.of(
                 Component.literal("Energy"),
                 Component.literal(energy + " / " + CelluloserBlockEntity.ENERGY_CAPACITY + " FE")
-            ), mouseX, mouseY);
+            ), Optional.empty(), mouseX, mouseY);
         }
         // Water tank tooltip
         else if (rx >= 29 && rx <= 49 && ry >= 13 && ry <= 69) {
             int water = menu.getWater();
-            g.setComponentTooltipForNextFrame(font, java.util.List.of(
+            g.setTooltipForNextFrame(font, java.util.List.of(
                 Component.literal("Water"),
                 Component.literal(water + " / " + CelluloserBlockEntity.TANK_CAPACITY + " mB")
-            ), mouseX, mouseY);
+            ), Optional.empty(), mouseX, mouseY);
         }
         // Cellulose tank tooltip
         else if (rx >= 127 && rx <= 147 && ry >= 13 && ry <= 69) {
             int cell = menu.getCellulose();
-            g.setComponentTooltipForNextFrame(font, java.util.List.of(
+            g.setTooltipForNextFrame(font, java.util.List.of(
                 Component.literal("Magic Cellulose"),
                 Component.literal(cell + " / " + CelluloserBlockEntity.TANK_CAPACITY + " mB")
-            ), mouseX, mouseY);
+            ), Optional.empty(), mouseX, mouseY);
         }
         // Progress arrow tooltip
         else if (rx >= 101 && rx <= 122 && ry >= 37 && ry <= 52) {
@@ -145,14 +145,14 @@ public class CelluloserScreen extends AbstractContainerScreen<CelluloserMenu> {
             int tot = menu.getTotalXp();
             if (tot > 0) {
                 int pct = (tot - rem) * 100 / tot;
-                g.setComponentTooltipForNextFrame(font, java.util.List.of(
+                g.setTooltipForNextFrame(font, java.util.List.of(
                     Component.literal("Processing"),
                     Component.literal(pct + "% (" + rem + " XP remaining)")
-                ), mouseX, mouseY);
+                ), Optional.empty(), mouseX, mouseY);
             } else {
-                g.setComponentTooltipForNextFrame(font, java.util.List.of(
+                g.setTooltipForNextFrame(font, java.util.List.of(
                     Component.literal("Idle — insert enchanted book")
-                ), mouseX, mouseY);
+                ), Optional.empty(), mouseX, mouseY);
             }
         }
     }

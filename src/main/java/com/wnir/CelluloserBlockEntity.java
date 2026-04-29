@@ -232,7 +232,7 @@ public class CelluloserBlockEntity extends BlockEntity implements Container, net
                     }
                 }
                 if (xp > 0) {
-                    be.items.set(0, ItemStack.EMPTY);
+                    input.shrink(1);
                     be.remainingXp = xp;
                     be.totalXp     = xp;
                     changed = true;

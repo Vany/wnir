@@ -43,15 +43,15 @@ public class ChunkLoaderData {
 
     public void forceAll(ServerLevel level) {
         for (BlockPos pos : loaders) {
-            ChunkPos cp = new ChunkPos(pos);
-            level.setChunkForced(cp.x, cp.z, true);
+            ChunkPos cp = new ChunkPos(pos.getX() >> 4, pos.getZ() >> 4);
+            level.setChunkForced(cp.x(), cp.z(), true);
         }
     }
 
     public void unforceAll(ServerLevel level) {
         for (BlockPos pos : loaders) {
-            ChunkPos cp = new ChunkPos(pos);
-            level.setChunkForced(cp.x, cp.z, false);
+            ChunkPos cp = new ChunkPos(pos.getX() >> 4, pos.getZ() >> 4);
+            level.setChunkForced(cp.x(), cp.z(), false);
         }
     }
 

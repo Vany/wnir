@@ -72,20 +72,20 @@ public final class MouseyCompassSearchManager {
         }
 
         // Stop if beyond max radius
-        int dx = next.x - task.originChunk.x;
-        int dz = next.z - task.originChunk.z;
+        int dx = next.x() - task.originChunk.x();
+        int dz = next.z() - task.originChunk.z();
         if (dx * dx + dz * dz > MAX_CHUNK_RADIUS * MAX_CHUNK_RADIUS) {
             tasks.remove(playerId);
             return new TickResult(null, null, -1);
         }
 
         // Chebyshev ring distance from origin
-        int ring = Math.max(Math.abs(next.x - task.originChunk.x), Math.abs(next.z - task.originChunk.z));
+        int ring = Math.max(Math.abs(next.x() - task.originChunk.x()), Math.abs(next.z() - task.originChunk.z()));
         int newRadius = (ring > task.lastReportedRadius) ? ring : -1;
         if (newRadius != -1) task.lastReportedRadius = ring;
 
         // Skip unloaded chunks — still add neighbors so search can continue past them
-        if (!level.hasChunk(next.x, next.z)) {
+        if (!level.hasChunk(next.x(), next.z())) {
             task.addNeighbors(next);
             return new TickResult(null, next, newRadius);
         }
@@ -107,7 +107,7 @@ public final class MouseyCompassSearchManager {
     }
 
     private static BlockPos scanChunk(ServerLevel level, ChunkPos cp, Block target) {
-        LevelChunk chunk = level.getChunk(cp.x, cp.z);
+        LevelChunk chunk = level.getChunk(cp.x(), cp.z());
         LevelChunkSection[] sections = chunk.getSections();
         int minSection = level.getMinY() / 16;
         int minX = cp.getMinBlockX();
@@ -153,8 +153,8 @@ public final class MouseyCompassSearchManager {
             ChunkPos best = null;
             int bestDist = Integer.MAX_VALUE;
             for (ChunkPos cp : frontier) {
-                int dx = cp.x - playerChunk.x;
-                int dz = cp.z - playerChunk.z;
+                int dx = cp.x() - playerChunk.x();
+                int dz = cp.z() - playerChunk.z();
                 int dist = dx * dx + dz * dz;
                 if (dist < bestDist) { bestDist = dist; best = cp; }
             }
@@ -166,10 +166,10 @@ public final class MouseyCompassSearchManager {
 
         void addNeighbors(ChunkPos cp) {
             for (ChunkPos n : new ChunkPos[]{
-                new ChunkPos(cp.x + 1, cp.z),
-                new ChunkPos(cp.x - 1, cp.z),
-                new ChunkPos(cp.x, cp.z + 1),
-                new ChunkPos(cp.x, cp.z - 1),
+                new ChunkPos(cp.x() + 1, cp.z()),
+                new ChunkPos(cp.x() - 1, cp.z()),
+                new ChunkPos(cp.x(), cp.z() + 1),
+                new ChunkPos(cp.x(), cp.z() - 1),
             }) {
                 if (!visited.contains(n)) frontier.add(n);
             }

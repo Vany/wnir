@@ -28,17 +28,26 @@ public final class WitherSilencerHandler {
         if (sound == null) return;
 
         Identifier id = sound.getIdentifier();
-        if (!WITHER_SPAWN.equals(id) && !WITHER_DEATH.equals(id)) return;
-
         Minecraft mc = Minecraft.getInstance();
         if (mc.level == null) return;
 
-        // Wither spawn/death sounds are global (no meaningful position).
-        // Suppress if any Wither Silencer exists in the current dimension.
         ResourceKey<Level> dim = mc.level.dimension();
         Set<BlockPos> positions = WitherSilencerBlockEntity.registry.get(dim);
         if (positions == null || positions.isEmpty()) return;
 
-        event.setSound(new DelegateSoundInstance(sound, 0f));
+        if (WITHER_SPAWN.equals(id) || WITHER_DEATH.equals(id)) {
+            // Global sounds — suppress if any silencer exists in this dimension.
+            event.setSound(new DelegateSoundInstance(sound, 0f));
+        } else if (id.getNamespace().equals("minecraft") && id.getPath().startsWith("music_disc.")) {
+            // Jukebox sound — suppress if a silencer is in the same chunk as the source.
+            int cx = (int) Math.floor(sound.getX()) >> 4;
+            int cz = (int) Math.floor(sound.getZ()) >> 4;
+            for (BlockPos pos : positions) {
+                if ((pos.getX() >> 4) == cx && (pos.getZ() >> 4) == cz) {
+                    event.setSound(new DelegateSoundInstance(sound, 0f));
+                    break;
+                }
+            }
+        }
     }
 }

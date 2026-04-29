@@ -1,0 +1,12 @@
+{
+  "type": "minecraft:crafting_shapeless",
+  "category": "misc",
+  "ingredients": [
+    "wnir:warding_post",
+    "minecraft:ender_pearl"
+  ],
+  "result": {
+    "id": "wnir:teleporter_inhibitor",
+    "count": 1
+  }
+}

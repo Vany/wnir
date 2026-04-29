@@ -4,6 +4,7 @@ import com.mojang.serialization.MapCodec;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.component.DataComponents;
 import net.minecraft.nbt.CompoundTag;
+import net.minecraft.world.InteractionHand;
 import net.minecraft.world.InteractionResult;
 import net.minecraft.world.entity.item.ItemEntity;
 import net.minecraft.world.entity.player.Player;
@@ -18,6 +19,8 @@ import net.minecraft.world.level.block.entity.BlockEntityType;
 import net.minecraft.world.level.block.state.BlockBehaviour;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.phys.BlockHitResult;
+import net.neoforged.neoforge.capabilities.Capabilities;
+import net.neoforged.neoforge.transfer.access.ItemAccess;
 
 /**
  * Celluloser — converts enchanted books + water + FE into magic cellulose fluid.
@@ -83,7 +86,31 @@ public class CelluloserBlock extends BaseEntityBlock {
         return super.playerWillDestroy(level, pos, state, player);
     }
 
-    /** Right-click opens the GUI. */
+    /**
+     * Right-click with a fluid container (empty bucket → get cellulose, water bucket → fill water tank).
+     * Uses NeoForge transfer FluidUtil which respects extract/isValid restrictions on the handler:
+     * slot 0 blocks extraction (water stays in), slot 1 blocks insertion (cellulose only comes out).
+     */
+    @Override
+    protected InteractionResult useItemOn(
+        ItemStack stack, BlockState state, Level level, BlockPos pos,
+        Player player, InteractionHand hand, BlockHitResult hit
+    ) {
+        // Empty hand → delegate to useWithoutItem (opens GUI).
+        if (stack.isEmpty()) {
+            return useWithoutItem(state, level, pos, player, hit);
+        }
+        // Only intercept if the held item has a fluid capability (bucket, fluid container, etc.)
+        if (ItemAccess.forStack(stack).oneByOne().getCapability(Capabilities.Fluid.ITEM) == null) {
+            return InteractionResult.PASS;
+        }
+        if (level.isClientSide()) return InteractionResult.SUCCESS;
+        boolean success = net.neoforged.neoforge.transfer.fluid.FluidUtil.interactWithFluidHandler(
+            player, hand, level, pos, hit.getDirection());
+        return success ? InteractionResult.CONSUME : InteractionResult.PASS;
+    }
+
+    /** Right-click with empty hand opens the GUI. */
     @Override
     protected InteractionResult useWithoutItem(
         BlockState state, Level level, BlockPos pos, Player player, BlockHitResult hit

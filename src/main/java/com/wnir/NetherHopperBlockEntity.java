@@ -10,14 +10,19 @@ import net.minecraft.world.inventory.AbstractContainerMenu;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.state.BlockState;
+import net.neoforged.neoforge.capabilities.Capabilities;
+import net.neoforged.neoforge.transfer.ResourceHandlerUtil;
+import net.neoforged.neoforge.transfer.item.ItemResource;
+import net.neoforged.neoforge.transfer.transaction.Transaction;
 
 /**
  * Nether Hopper — slot-mapped regulator.
  *
  * Every 16 ticks: hopper slot N pulls from source slot N, pushes to target slot N.
  * Never ejects the last item from any slot (count must be > 1 to push).
- * Requires Container on both source and target; no capability fallback (slot indexing
- * is the core feature and cannot be emulated without indexed access).
+ * Prefers Container (slot-indexed) for source/target; falls back to Capabilities.Item.BLOCK
+ * for modded inventories that don't implement Container (e.g. Sophisticated Barrels).
+ * Capability fallback uses per-slot matching (pull: same-type only; push: insertStacking).
  */
 public class NetherHopperBlockEntity extends AbstractWnirHopperBlockEntity {
 
@@ -43,9 +48,10 @@ public class NetherHopperBlockEntity extends AbstractWnirHopperBlockEntity {
     protected boolean doCycle(Level level, BlockPos pos) {
         boolean moved = false;
 
-        // Pull: hopper slot N ← source slot N
+        // ── Pull: hopper slot N ← source slot N ──────────────────────────
         var sourceBe = level.getBlockEntity(pos.above());
         if (sourceBe instanceof Container source) {
+            boolean pulled = false;
             int limit = Math.min(SIZE, source.getContainerSize());
             for (int slot = 0; slot < limit; slot++) {
                 ItemStack src = source.getItem(slot);
@@ -61,18 +67,36 @@ public class NetherHopperBlockEntity extends AbstractWnirHopperBlockEntity {
                 if (canAccept <= 0) continue;
 
                 int amount = Math.min(Math.min(src.getCount(), canAccept), PER_SLOT);
+                ItemStack toAdd = src.copyWithCount(amount);
                 source.removeItem(slot, amount);
                 if (current.isEmpty()) {
-                    items.set(slot, src.copyWithCount(amount));
+                    items.set(slot, toAdd);
                 } else {
                     current.grow(amount);
                 }
-                moved = true;
+                pulled = true;
             }
-            if (moved) source.setChanged();
+            if (pulled) { source.setChanged(); moved = true; }
+        } else {
+            // Capability fallback: extract matching items into each occupied hopper slot.
+            // Empty slots are skipped — we can't enumerate what's available in the source.
+            var cap = level.getCapability(Capabilities.Item.BLOCK, pos.above(), Direction.DOWN);
+            if (cap != null) {
+                for (int slot = 0; slot < SIZE; slot++) {
+                    ItemStack current = items.get(slot);
+                    if (current.isEmpty()) continue;
+                    int canAccept = current.getMaxStackSize() - current.getCount();
+                    if (canAccept <= 0) continue;
+                    int toTake = Math.min(canAccept, PER_SLOT);
+                    try (var tx = Transaction.openRoot()) {
+                        long extracted = cap.extract(ItemResource.of(current), toTake, tx);
+                        if (extracted > 0) { tx.commit(); current.grow((int) extracted); moved = true; }
+                    }
+                }
+            }
         }
 
-        // Push: hopper slot N → target slot N, never last item
+        // ── Push: hopper slot N → target slot N, never last item ──────────
         var targetBe = level.getBlockEntity(pos.relative(facing));
         if (targetBe instanceof Container target) {
             boolean pushed = false;
@@ -103,9 +127,20 @@ public class NetherHopperBlockEntity extends AbstractWnirHopperBlockEntity {
                 removeItem(slot, amount);
                 pushed = true;
             }
-            if (pushed) {
-                target.setChanged();
-                moved = true;
+            if (pushed) { target.setChanged(); moved = true; }
+        } else {
+            // Capability fallback: push each slot (count > 1) into target without slot mapping.
+            var cap = level.getCapability(Capabilities.Item.BLOCK, pos.relative(facing), facing.getOpposite());
+            if (cap != null) {
+                for (int slot = 0; slot < SIZE; slot++) {
+                    ItemStack stack = items.get(slot);
+                    if (stack.getCount() <= 1) continue;
+                    int toEject = Math.min(stack.getCount() - 1, PER_SLOT);
+                    try (var tx = Transaction.openRoot()) {
+                        int inserted = ResourceHandlerUtil.insertStacking(cap, ItemResource.of(stack), toEject, tx);
+                        if (inserted > 0) { tx.commit(); removeItem(slot, inserted); moved = true; }
+                    }
+                }
             }
         }
 

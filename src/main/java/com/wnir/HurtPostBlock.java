@@ -12,7 +12,7 @@ import net.minecraft.world.level.block.state.BlockState;
  * Hurt Post — warding column block that deals 1 heart of armor-bypassing magic damage
  * every 4 ticks to all hostile mobs (Enemy implementors) within the column radius.
  *
- * Participates in the mixed warding column; contributes HURT_RADIUS to total column radius.
+ * Participates in the mixed warding column; contributes NO radius (damage-only post).
  */
 public class HurtPostBlock extends WardingColumnBaseBlock {
 

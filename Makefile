@@ -33,6 +33,6 @@ jar: build
 	@ls -la build/libs/*.jar 2>/dev/null || true
 
 install: jar
-	@echo "Installing to PrismLauncher..."
-	@cp build/libs/wnir-1.21.11-1.0.0.jar "/Users/vany/Library/Application Support/PrismLauncher/instances/VanyLLa3d/minecraft/mods/"
+	@echo "Installing to PrismLauncher ATM11..."
+	@cp build/libs/wnir-26.1.2-1.0.0.jar "/Users/vany/Library/Application Support/PrismLauncher/instances/ATM11/minecraft/mods/"
 	@echo "Installed."

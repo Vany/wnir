@@ -1,0 +1,10 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "pattern": ["EBE", "ECE", "EEE"],
+  "key": {
+    "E": "minecraft:emerald",
+    "B": "minecraft:bell",
+    "C": "minecraft:chest"
+  },
+  "result": {"id": "wnir:trader", "count": 1}
+}

@@ -1,10 +1,11 @@
 package com.wnir;
 
-import net.minecraft.core.HolderLookup;
 import net.minecraft.core.NonNullList;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
-import net.minecraft.world.item.crafting.CraftingBookCategory;
+import com.mojang.serialization.MapCodec;
+import net.minecraft.network.codec.StreamCodec;
+import net.minecraft.network.RegistryFriendlyByteBuf;
 import net.minecraft.world.item.crafting.CraftingInput;
 import net.minecraft.world.item.crafting.CustomRecipe;
 import net.minecraft.world.item.crafting.RecipeSerializer;
@@ -24,15 +25,19 @@ import net.minecraft.world.level.Level;
  */
 public class KelpCompressionRecipe extends CustomRecipe {
 
-    public static final CustomRecipe.Serializer<KelpCompressionRecipe> SERIALIZER =
-        new CustomRecipe.Serializer<>(KelpCompressionRecipe::new);
+    private static final KelpCompressionRecipe INSTANCE = new KelpCompressionRecipe();
+    public static final RecipeSerializer<KelpCompressionRecipe> SERIALIZER =
+        new RecipeSerializer<>(
+            MapCodec.unit(INSTANCE),
+            StreamCodec.unit(INSTANCE)
+        );
 
-    public KelpCompressionRecipe(CraftingBookCategory category) {
-        super(category);
+    public KelpCompressionRecipe() {
+        super();
     }
 
     @Override
-    public RecipeSerializer<? extends CustomRecipe> getSerializer() {
+    public RecipeSerializer<KelpCompressionRecipe> getSerializer() {
         return WnirRegistries.KELP_COMPRESSION_RECIPE.get();
     }
 
@@ -52,7 +57,7 @@ public class KelpCompressionRecipe extends CustomRecipe {
     }
 
     @Override
-    public ItemStack assemble(CraftingInput input, HolderLookup.Provider registries) {
+    public ItemStack assemble(CraftingInput input) {
         return new ItemStack(Items.SLIME_BALL);
     }
 

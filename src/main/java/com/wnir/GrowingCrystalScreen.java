@@ -1,6 +1,6 @@
 package com.wnir;
 
-import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.gui.screens.MenuScreens;
 import net.minecraft.client.gui.screens.inventory.AbstractContainerScreen;
 import net.minecraft.client.renderer.RenderPipelines;
@@ -25,17 +25,15 @@ public class GrowingCrystalScreen extends AbstractContainerScreen<GrowingCrystal
 
     public GrowingCrystalScreen(GrowingCrystalMenu menu, Inventory inv, Component title,
                                 Identifier background, int colorProgress) {
-        super(menu, inv, title);
+        super(menu, inv, title, GrowingCrystalMenu.IMG_W, GrowingCrystalMenu.IMG_H);
         this.background    = background;
         this.colorProgress = colorProgress;
-        imageWidth         = GrowingCrystalMenu.IMG_W;
-        imageHeight        = GrowingCrystalMenu.IMG_H;
         inventoryLabelY    = Integer.MAX_VALUE;
         titleLabelY        = Integer.MAX_VALUE;
     }
 
     @Override
-    protected void renderBg(GuiGraphics g, float partialTick, int mouseX, int mouseY) {
+    public void extractContents(GuiGraphicsExtractor g, int mouseX, int mouseY, float partialTick) {
         g.blit(RenderPipelines.GUI_TEXTURED, background,
                leftPos, topPos, 0f, 0f, imageWidth, imageHeight, 256, 256);
 
@@ -55,27 +53,27 @@ public class GrowingCrystalScreen extends AbstractContainerScreen<GrowingCrystal
     }
 
     @Override
-    protected void renderLabels(GuiGraphics g, int mouseX, int mouseY) {
-        g.drawCenteredString(font, title, imageWidth / 2, 6, COLOR_WHITE);
-        g.drawCenteredString(font, menu.getProgress() / 100 + "%", imageWidth / 2, 64, COLOR_WHITE);
+    protected void extractLabels(GuiGraphicsExtractor g, int mouseX, int mouseY) {
+        g.centeredText(font, title, imageWidth / 2, 6, COLOR_WHITE);
+        g.centeredText(font, Component.literal(menu.getProgress() / 100 + "%"), imageWidth / 2, 64, COLOR_WHITE);
 
         if (menu.getProgress() >= 10000) {
-            g.drawCenteredString(font, Component.literal("Ready!"), imageWidth / 2, 74, colorProgress);
+            g.centeredText(font, Component.literal("Ready!"), imageWidth / 2, 74, colorProgress);
         } else if (menu.getClockCount() == 0) {
-            g.drawCenteredString(font, Component.literal("No clocks below!"), imageWidth / 2, 74, 0xFFFF5555);
+            g.centeredText(font, Component.literal("No clocks below!"), imageWidth / 2, 74, 0xFFFF5555);
         } else {
             long ticksLeft = (long) GrowingCrystalBlockEntity.BASE_TICKS
                 * (10000 - menu.getProgress()) / 10000 / menu.getClockCount();
-            g.drawCenteredString(font, Component.literal(
+            g.centeredText(font, Component.literal(
                 ticksLeft / 24000 + "d " + (ticksLeft % 24000) / 1000 + "h left"),
                 imageWidth / 2, 74, COLOR_GRAY);
         }
     }
 
     @Override
-    public void render(GuiGraphics g, int mouseX, int mouseY, float partialTick) {
-        super.render(g, mouseX, mouseY, partialTick);
-        renderTooltip(g, mouseX, mouseY);
+    public void extractRenderState(GuiGraphicsExtractor g, int mouseX, int mouseY, float partialTick) {
+        super.extractRenderState(g, mouseX, mouseY, partialTick);
+        extractTooltip(g, mouseX, mouseY);
     }
 
     /** Returns a screen constructor for {@link net.neoforged.neoforge.client.event.RegisterMenuScreensEvent}. */

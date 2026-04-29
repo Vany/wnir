@@ -63,6 +63,8 @@ public final class WnirRegistries {
         MOB_EFFECTS.register("insane_light", () -> WnirEffects.marker(0xFFFF44));
     public static final Holder<MobEffect> DEAD_BLOW =
         MOB_EFFECTS.register("dead_blow", () -> WnirEffects.marker(0xFF2200));
+    public static final Holder<MobEffect> SILENCE =
+        MOB_EFFECTS.register("silence", () -> WnirEffects.marker(0xC0C0E8));
 
     // ── Potions ──────────────────────────────────────────────────────────
 
@@ -77,6 +79,16 @@ public final class WnirRegistries {
     public static final DeferredHolder<Potion, Potion> MARTIAL_LIGHTNING_POTION =
         POTIONS.register("martial_lightning", () ->
             new Potion("martial_lightning", new MobEffectInstance(MARTIAL_LIGHTNING, 3600, 0))
+        );
+
+    public static final DeferredHolder<Potion, Potion> SILENCE_POTION =
+        POTIONS.register("silence", () ->
+            new Potion("silence", new MobEffectInstance(SILENCE, 3600, 0))
+        );
+
+    public static final DeferredHolder<Potion, Potion> STRONG_SILENCE_POTION =
+        POTIONS.register("strong_silence", () ->
+            new Potion("strong_silence", new MobEffectInstance(SILENCE, 1800, 1))
         );
 
     // ── Block / Item registers (declared early; ITEMS needed before fluid bucket) ──
@@ -159,14 +171,17 @@ public final class WnirRegistries {
             WnirMod.MOD_ID
         );
 
-    public static final Supplier<net.minecraft.world.item.crafting.CustomRecipe.Serializer<AccumulatorCombineRecipe>> ACCUMULATOR_COMBINE_RECIPE =
+    public static final Supplier<RecipeSerializer<AccumulatorCombineRecipe>> ACCUMULATOR_COMBINE_RECIPE =
         RECIPE_SERIALIZERS.register("accumulator_combine", () -> AccumulatorCombineRecipe.SERIALIZER);
 
-    public static final Supplier<net.minecraft.world.item.crafting.CustomRecipe.Serializer<KelpCompressionRecipe>> KELP_COMPRESSION_RECIPE =
+    public static final Supplier<RecipeSerializer<KelpCompressionRecipe>> KELP_COMPRESSION_RECIPE =
         RECIPE_SERIALIZERS.register("kelp_compression", () -> KelpCompressionRecipe.SERIALIZER);
 
-    public static final Supplier<net.minecraft.world.item.crafting.CustomRecipe.Serializer<SpawnerCraftingRecipe>> SPAWNER_CRAFTING_RECIPE =
+    public static final Supplier<RecipeSerializer<SpawnerCraftingRecipe>> SPAWNER_CRAFTING_RECIPE =
         RECIPE_SERIALIZERS.register("spawner_crafting", () -> SpawnerCraftingRecipe.SERIALIZER);
+
+    public static final Supplier<RecipeSerializer<NbtWiperRecipe>> NBT_WIPER_RECIPE =
+        RECIPE_SERIALIZERS.register("nbt_wiper", () -> NbtWiperRecipe.SERIALIZER);
 
     @SuppressWarnings("unchecked")
     private static final DeferredRegister<MenuType<?>> MENU_TYPES =
@@ -293,10 +308,13 @@ public final class WnirRegistries {
     /** Single shared BE type for all warding column blocks. */
     private static final Supplier<BlockEntityType<WardingColumnBlockEntity>> WARDING_COLUMN_BE =
         BLOCK_ENTITIES.register("warding_column", () -> {
-            Set<Block> blocks = Set.of(
-                WARDING_POST.block.get(), TELEPORTER_INHIBITOR.block.get(),
-                REPELLING_POST.block.get(), LIGHTING_POST.block.get(),
-                HURT_POST.block.get(), SILENCER_POST.block.get(),
+            Set<Block> blocks = java.util.Set.of(
+                WARDING_POST.block.get(),
+                REPELLING_POST.block.get(),
+                TELEPORTER_INHIBITOR.block.get(),
+                LIGHTING_POST.block.get(),
+                HURT_POST.block.get(),
+                SILENCER_POST.block.get(),
                 RESHAPER_POST.block.get()
             );
             return new BlockEntityType<>(WardingColumnBlockEntity::create, blocks);
@@ -408,6 +426,15 @@ public final class WnirRegistries {
                 .requiresCorrectToolForDrops(),
             (b, p) -> new WnirBlockItem(b, p, "celluloser", WnirBlockItem::celluloserDataLines));
 
+    private static final BlockBundle<TraderBlock, TraderBlockEntity> TRADER =
+        registerBlock("trader", TraderBlock::new, TraderBlockEntity::new,
+            BlockBehaviour.Properties.of()
+                .mapColor(MapColor.COLOR_GREEN)
+                .sound(SoundType.METAL)
+                .strength(5.0f, 6.0f)
+                .requiresCorrectToolForDrops(),
+            (b, p) -> new WnirBlockItem(b, p.stacksTo(1), "trader"));
+
     // ── Standalone items ─────────────────────────────────────────────────
 
     public static final Supplier<SeedBundleItem> SEED_BUNDLE_ITEM =
@@ -459,6 +486,15 @@ public final class WnirRegistries {
             )
         );
 
+    public static final Supplier<NbtWiperLiquidItem> NBT_WIPER_LIQUID_ITEM =
+        ITEMS.register("nbt_wiper_liquid", () ->
+            new NbtWiperLiquidItem(
+                new Item.Properties()
+                    .stacksTo(16)
+                    .setId(ResourceKey.create(Registries.ITEM, id("nbt_wiper_liquid")))
+            )
+        );
+
     // ── Public accessors ─────────────────────────────────────────────────
 
     public static final Supplier<MenuType<WnirHopperMenu>> MOSSY_HOPPER_MENU =
@@ -481,6 +517,9 @@ public final class WnirRegistries {
 
     public static final Supplier<MenuType<CelluloserMenu>> CELLULOSER_MENU =
         MENU_TYPES.register("celluloser", () -> new MenuType<>(CelluloserMenu::new, FeatureFlags.VANILLA_SET));
+
+    public static final Supplier<MenuType<TraderMenu>> TRADER_MENU =
+        MENU_TYPES.register("trader", () -> new MenuType<>(TraderMenu::new, FeatureFlags.VANILLA_SET));
 
     public static final Supplier<BlockEntityType<MossyHopperBlockEntity>> MOSSY_HOPPER_BE = MOSSY_HOPPER.entity;
     public static final Supplier<BlockItem> MOSSY_HOPPER_ITEM = MOSSY_HOPPER.item;
@@ -513,6 +552,9 @@ public final class WnirRegistries {
 
     public static final Supplier<BlockEntityType<CelluloserBlockEntity>> CELLULOSER_BE = CELLULOSER.entity;
     public static final Supplier<BlockItem> CELLULOSER_ITEM = CELLULOSER.item;
+
+    public static final Supplier<BlockEntityType<TraderBlockEntity>> TRADER_BE = TRADER.entity;
+    public static final Supplier<BlockItem> TRADER_ITEM = TRADER.item;
 
     public static final Supplier<BlockEntityType<AccumulatorBlockEntity>> ACCUMULATOR_BE = ACCUMULATOR.entity;
     public static final Supplier<AccumulatorBlock> ACCUMULATOR_BLOCK = ACCUMULATOR.block;
@@ -566,10 +608,12 @@ public final class WnirRegistries {
                     output.accept(MOUSEY_COMPASS_ITEM.get());
                     output.accept(WIRELESS_FUEL_ITEM.get());
                     output.accept(SKULL_BEEHIVE_ITEM.get());
+                    output.accept(NBT_WIPER_LIQUID_ITEM.get());
                     output.accept(MAGIC_CELLULOSE_BUCKET.get());
                     output.accept(CELLULOSER_ITEM.get());
                     output.accept(ACCUMULATOR_ITEM.get());
                     output.accept(SPAWNER_ITEM.get());
+                    output.accept(TRADER_ITEM.get());
                 })
                 .build()
         );

@@ -126,9 +126,10 @@ public abstract class AbstractWnirHopperBlockEntity
                     : Math.min(src.getCount(), current.getMaxStackSize() - current.getCount()));
             if (amount <= 0) continue;
 
+            ItemStack toAdd = src.copyWithCount(amount); // capture before removeItem mutates src
             source.removeItem(i, amount);
             if (current.isEmpty()) {
-                items.set(hopperSlot, src.copyWithCount(amount));
+                items.set(hopperSlot, toAdd);
                 current = items.get(hopperSlot);
             } else {
                 current.grow(amount);

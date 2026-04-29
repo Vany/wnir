@@ -51,7 +51,7 @@ public final class ColumnHelper {
         Consumer<T> action
     ) {
         BlockPos base = findBase(level, excluded.below(), columnType);
-        BlockPos check = base.above();
+        BlockPos check = base; // start at base, not base.above() — otherwise the base block is never re-notified
         while (true) {
             if (check.equals(excluded)) { check = check.above(); continue; }
             if (!columnType.isInstance(level.getBlockState(check).getBlock())) break;

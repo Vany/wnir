@@ -49,10 +49,10 @@ public class CelluloserMenu extends AbstractContainerMenu {
 
         checkContainerSize(container, 1);
 
-        // Input slot — any enchanted item allowed
+        // Input slot — enchanted items or config-defined extra sources
         addSlot(new Slot(container, 0, 80, 36) {
             @Override public boolean mayPlace(ItemStack stack) {
-                return CelluloserBlockEntity.isEnchanted(stack);
+                return CelluloserBlockEntity.isEnchanted(stack) || CelluloserBlockEntity.isConfigSource(stack);
             }
         });
 
@@ -96,8 +96,8 @@ public class CelluloserMenu extends AbstractContainerMenu {
             if (!moveItemStackTo(stack, PLAYER_INV_START, HOTBAR_END, true)) return ItemStack.EMPTY;
             slot.onQuickCraft(stack, result);
         } else {
-            // Player inventory → input slot (any enchanted item)
-            if (CelluloserBlockEntity.isEnchanted(stack)) {
+            // Player inventory → input slot (enchanted or config source)
+            if (CelluloserBlockEntity.isEnchanted(stack) || CelluloserBlockEntity.isConfigSource(stack)) {
                 if (!moveItemStackTo(stack, BOOK_SLOT, PLAYER_INV_START, false)) return ItemStack.EMPTY;
             } else if (index < PLAYER_INV_END) {
                 // Inventory row → hotbar

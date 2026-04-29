@@ -1,12 +1,13 @@
 package com.wnir;
 
-import net.minecraft.core.HolderLookup;
 import net.minecraft.core.component.DataComponents;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.world.item.BlockItem;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.component.TypedEntityData;
-import net.minecraft.world.item.crafting.CraftingBookCategory;
+import com.mojang.serialization.MapCodec;
+import net.minecraft.network.codec.StreamCodec;
+import net.minecraft.network.RegistryFriendlyByteBuf;
 import net.minecraft.world.item.crafting.CraftingInput;
 import net.minecraft.world.item.crafting.CustomRecipe;
 import net.minecraft.world.item.crafting.RecipeSerializer;
@@ -22,15 +23,19 @@ import net.minecraft.world.level.Level;
  */
 public class AccumulatorCombineRecipe extends CustomRecipe {
 
-    public static final CustomRecipe.Serializer<AccumulatorCombineRecipe> SERIALIZER =
-        new CustomRecipe.Serializer<>(AccumulatorCombineRecipe::new);
+    private static final AccumulatorCombineRecipe INSTANCE = new AccumulatorCombineRecipe();
+    public static final RecipeSerializer<AccumulatorCombineRecipe> SERIALIZER =
+        new RecipeSerializer<>(
+            MapCodec.unit(INSTANCE),
+            StreamCodec.unit(INSTANCE)
+        );
 
-    public AccumulatorCombineRecipe(CraftingBookCategory category) {
-        super(category);
+    public AccumulatorCombineRecipe() {
+        super();
     }
 
     @Override
-    public RecipeSerializer<? extends CustomRecipe> getSerializer() {
+    public RecipeSerializer<AccumulatorCombineRecipe> getSerializer() {
         return WnirRegistries.ACCUMULATOR_COMBINE_RECIPE.get();
     }
 
@@ -49,7 +54,7 @@ public class AccumulatorCombineRecipe extends CustomRecipe {
 
     /** Sum capacity and energy from all input accumulators. */
     @Override
-    public ItemStack assemble(CraftingInput input, HolderLookup.Provider registries) {
+    public ItemStack assemble(CraftingInput input) {
         long totalCapacity = 0;
         long totalEnergy   = 0;
 

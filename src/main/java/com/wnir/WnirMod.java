@@ -90,6 +90,7 @@ public class WnirMod {
             );
         });
 
+        NeoForge.EVENT_BUS.addListener(BlockDeleteHandler::onChunkLoad);
         NeoForge.EVENT_BUS.addListener(MartialLightningHandler::onLivingIncomingDamage);
         NeoForge.EVENT_BUS.addListener(DeadBlowHandler::onLivingIncomingDamage);
         NeoForge.EVENT_BUS.addListener(HomingArcheryHandler::onArrowLoose);
@@ -160,6 +161,21 @@ public class WnirMod {
             }
         );
 
+        // Load block-delete config before any chunks load (spawn chunks load during ServerStarting)
+        NeoForge.EVENT_BUS.addListener(
+            (net.neoforged.neoforge.event.server.ServerAboutToStartEvent e) -> {
+                CelluloserConfig.load();
+                BlockDeleteConfig.load();
+            }
+        );
+        // Re-force chunks whenever any dimension loads (handles lazy/custom dimensions too)
+        NeoForge.EVENT_BUS.addListener(
+            (net.neoforged.neoforge.event.level.LevelEvent.Load e) -> {
+                if (e.getLevel() instanceof net.minecraft.server.level.ServerLevel level) {
+                    ChunkLoaderData.get(level).forceAll(level);
+                }
+            }
+        );
         NeoForge.EVENT_BUS.addListener(
             (net.neoforged.neoforge.event.server.ServerStartingEvent e) -> onServerStarting(e)
         );
@@ -169,16 +185,13 @@ public class WnirMod {
     }
 
     private void onServerStarting(net.neoforged.neoforge.event.server.ServerStartingEvent event) {
-        var server = event.getServer();
-        for (var level : server.getAllLevels()) {
-            ChunkLoaderData.get(level).forceAll(level);
-        }
         // Pre-load personal dimension manager so biome source map is populated before any player joins
-        PersonalDimensionManager.get(server);
-        CelluloserConfig.load();
+        PersonalDimensionManager.get(event.getServer());
+        // configs already loaded in ServerAboutToStartEvent
     }
 
     private void onServerStopping(net.neoforged.neoforge.event.server.ServerStoppingEvent event) {
+        BlockDeleteConfig.pruneDeleted();
         SpawnerAgitatorBlockEntity.unbindAll();
         WardingColumnBlockEntity.clearRegistry();
         WitherSilencerBlockEntity.clearRegistry();

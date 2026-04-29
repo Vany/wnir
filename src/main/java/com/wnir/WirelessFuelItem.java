@@ -92,7 +92,7 @@ public final class WirelessFuelItem extends Item {
         BlockPos pos = ctx.getClickedPos();
         EnergyHandler handler = level.getCapability(Capabilities.Energy.BLOCK, pos, ctx.getClickedFace());
         if (handler == null) {
-            player.displayClientMessage(Component.literal("No energy source here"), true);
+            player.sendOverlayMessage(Component.literal("No energy source here"));
             return InteractionResult.FAIL;
         }
 
@@ -106,8 +106,7 @@ public final class WirelessFuelItem extends Item {
         save(stack, tag);
         setModelState(stack, STATE_IDLE);
 
-        player.displayClientMessage(
-            Component.literal("Linked to " + pos.toShortString()), true);
+        player.sendOverlayMessage(Component.literal("Linked to " + pos.toShortString()));
         return InteractionResult.SUCCESS;
     }
 
@@ -137,7 +136,9 @@ public final class WirelessFuelItem extends Item {
     // ── Permanent device ──────────────────────────────────────────────────────
 
     @Override
-    public ItemStack getCraftingRemainder(ItemStack stack) {
+    @javax.annotation.Nullable
+    public net.minecraft.world.item.ItemStackTemplate getCraftingRemainder(net.minecraft.world.item.ItemInstance instance) {
+        if (!(instance instanceof ItemStack stack)) return null;
         ItemStack copy = stack.copy();
         copy.setCount(1);
         // Deduct fuel cost here — called exactly once per burn cycle when the furnace
@@ -156,7 +157,7 @@ public final class WirelessFuelItem extends Item {
             save(copy, tag);
             setModelState(copy, STATE_ACTIVE);
         }
-        return copy;
+        return net.minecraft.world.item.ItemStackTemplate.fromNonEmptyStack(copy);
     }
 
     // ── Durability bar = buffer level ─────────────────────────────────────────

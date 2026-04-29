@@ -1,6 +1,6 @@
 package com.wnir;
 
-import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.gui.screens.inventory.AbstractContainerScreen;
 import net.minecraft.client.renderer.RenderPipelines;
 import net.minecraft.network.chat.Component;
@@ -40,14 +40,12 @@ public class SkullBeehiveScreen extends AbstractContainerScreen<SkullBeehiveMenu
     private static final int COLOR_GUN_EMPTY   = 0xFF333333;
 
     public SkullBeehiveScreen(SkullBeehiveMenu menu, Inventory playerInv, Component title) {
-        super(menu, playerInv, title);
-        this.imageWidth   = 176;
-        this.imageHeight  = SkullBeehiveMenu.IMAGE_HEIGHT; // 165
+        super(menu, playerInv, title, 176, SkullBeehiveMenu.IMAGE_HEIGHT);
         this.inventoryLabelY = 80;
     }
 
     @Override
-    protected void renderBg(GuiGraphics g, float partialTick, int mouseX, int mouseY) {
+    public void extractContents(GuiGraphicsExtractor g, int mouseX, int mouseY, float partialTick) {
         g.blit(RenderPipelines.GUI_TEXTURED, BACKGROUND,
             leftPos, topPos, 0f, 0f, imageWidth, imageHeight, 256, 256);
 
@@ -63,22 +61,22 @@ public class SkullBeehiveScreen extends AbstractContainerScreen<SkullBeehiveMenu
     }
 
     @Override
-    protected void renderLabels(GuiGraphics g, int mouseX, int mouseY) {
+    protected void extractLabels(GuiGraphicsExtractor g, int mouseX, int mouseY) {
         // Draw container title only — skip playerInventoryTitle ("Inventory" is redundant).
-        g.drawString(font, title, titleLabelX, titleLabelY, 0x404040, false);
+        g.text(font, title, titleLabelX, titleLabelY, 0x404040, false);
         int arrowCount = menu.data.get(0);
         int gunCount   = menu.data.get(1);
         // Count labels to the right of each bar
-        g.drawString(font, String.valueOf(arrowCount),
+        g.text(font, String.valueOf(arrowCount),
             BAR_X + BAR_WIDTH + 4, BAR_ARROW_Y + 1, 0x446644, false);
-        g.drawString(font, String.valueOf(gunCount),
+        g.text(font, String.valueOf(gunCount),
             BAR_X + BAR_WIDTH + 4, BAR_GUNPOWDER_Y + 1, 0x666666, false);
     }
 
     @Override
-    public void render(GuiGraphics g, int mouseX, int mouseY, float partialTick) {
-        super.render(g, mouseX, mouseY, partialTick);
-        renderTooltip(g, mouseX, mouseY);
+    public void extractRenderState(GuiGraphicsExtractor g, int mouseX, int mouseY, float partialTick) {
+        super.extractRenderState(g, mouseX, mouseY, partialTick);
+        extractTooltip(g, mouseX, mouseY);
     }
 
     /**
@@ -86,7 +84,7 @@ public class SkullBeehiveScreen extends AbstractContainerScreen<SkullBeehiveMenu
      * No extra border — the texture provides the inset shadow/highlight.
      */
     private static void renderBar(
-        GuiGraphics g, int x, int y, int current, int max,
+        GuiGraphicsExtractor g, int x, int y, int current, int max,
         int colorFull, int colorEmpty
     ) {
         g.fill(x, y, x + BAR_WIDTH, y + BAR_HEIGHT, colorEmpty);

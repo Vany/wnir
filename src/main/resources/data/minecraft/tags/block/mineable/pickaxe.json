@@ -18,6 +18,7 @@
     "wnir:spawner",
     "wnir:silencer_post",
     "wnir:reshaper_post",
-    "wnir:wither_silencer"
+    "wnir:wither_silencer",
+    "wnir:trader"
   ]
 }

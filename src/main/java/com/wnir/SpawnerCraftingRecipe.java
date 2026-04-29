@@ -2,13 +2,14 @@ package com.wnir;
 
 import java.util.List;
 import java.util.Optional;
-import net.minecraft.core.HolderLookup;
 import net.minecraft.core.component.DataComponents;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
 import net.minecraft.world.item.component.CustomData;
-import net.minecraft.world.item.crafting.CraftingBookCategory;
+import com.mojang.serialization.MapCodec;
+import net.minecraft.network.codec.StreamCodec;
+import net.minecraft.network.RegistryFriendlyByteBuf;
 import net.minecraft.world.item.crafting.CraftingInput;
 import net.minecraft.world.item.crafting.CustomRecipe;
 import net.minecraft.world.item.crafting.Ingredient;
@@ -31,15 +32,19 @@ import net.minecraft.world.level.Level;
  */
 public class SpawnerCraftingRecipe extends CustomRecipe {
 
-    public static final CustomRecipe.Serializer<SpawnerCraftingRecipe> SERIALIZER =
-        new CustomRecipe.Serializer<>(SpawnerCraftingRecipe::new);
+    private static final SpawnerCraftingRecipe INSTANCE = new SpawnerCraftingRecipe();
+    public static final RecipeSerializer<SpawnerCraftingRecipe> SERIALIZER =
+        new RecipeSerializer<>(
+            MapCodec.unit(INSTANCE),
+            StreamCodec.unit(INSTANCE)
+        );
 
-    public SpawnerCraftingRecipe(CraftingBookCategory category) {
-        super(category);
+    public SpawnerCraftingRecipe() {
+        super();
     }
 
     @Override
-    public RecipeSerializer<? extends CustomRecipe> getSerializer() {
+    public RecipeSerializer<SpawnerCraftingRecipe> getSerializer() {
         return WnirRegistries.SPAWNER_CRAFTING_RECIPE.get();
     }
 
@@ -80,7 +85,7 @@ public class SpawnerCraftingRecipe extends CustomRecipe {
     }
 
     @Override
-    public ItemStack assemble(CraftingInput input, HolderLookup.Provider registries) {
+    public ItemStack assemble(CraftingInput input) {
         return new ItemStack(WnirRegistries.SPAWNER_ITEM.get());
     }
 

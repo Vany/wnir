@@ -1,0 +1,12 @@
+{
+  "type": "minecraft:crafting_shapeless",
+  "category": "misc",
+  "ingredients": [
+    "wnir:warding_post",
+    "minecraft:obsidian"
+  ],
+  "result": {
+    "id": "wnir:reshaper_post",
+    "count": 1
+  }
+}

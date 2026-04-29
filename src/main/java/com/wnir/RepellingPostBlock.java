@@ -8,7 +8,7 @@ import net.minecraft.world.level.block.entity.BlockEntityType;
 import net.minecraft.world.level.block.state.BlockBehaviour;
 import net.minecraft.world.level.block.state.BlockState;
 
-/** Repelling Post: contributes +4 to column radius and enables mob repulsion. */
+/** Repelling Post: contributes +4 to column radius and enables aggressive mob repulsion. */
 public class RepellingPostBlock extends WardingColumnBaseBlock {
 
     private static final MapCodec<RepellingPostBlock> CODEC = simpleCodec(RepellingPostBlock::new);

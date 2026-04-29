@@ -84,24 +84,24 @@
   "tooltip.wnir.spawner_agitator": "Stacks below spawners to boost their speed and range.",
   "tooltip.wnir.spawner_agitator.detail": "Each block in the column reduces spawner delay and expands its range.",
 
-  "tooltip.wnir.warding_post": "Pushes hostiles away. +6 radius per post.",
-  "tooltip.wnir.warding_post.detail": "Stack with other column posts. Loot only — no crafting recipe.",
+  "tooltip.wnir.warding_post": "Adds +6 radius to the column. No active effect.",
+  "tooltip.wnir.warding_post.detail": "Stack with other posts to increase total column radius. Loot only — no crafting recipe.",
 
   "tooltip.wnir.teleporter_inhibitor": "Cancels teleports in range. +4 radius per post.",
-  "tooltip.wnir.teleporter_inhibitor.detail": "Affects ender pearls, chorus fruit, and all teleports. Loot only.",
+  "tooltip.wnir.teleporter_inhibitor.detail": "Affects ender pearls, chorus fruit, and all teleports. Craft: Warding Post + Ender Pearl.",
 
-  "tooltip.wnir.repelling_post": "Adds radius to a warding column. +4 per post.",
-  "tooltip.wnir.repelling_post.detail": "No effect on its own — mix with Warding Post. Loot only.",
+  "tooltip.wnir.repelling_post": "Repels aggressive mobs. +4 radius per post.",
+  "tooltip.wnir.repelling_post.detail": "Pushes hostile mobs outward. Works standalone or mixed with other posts. Craft: Warding Post + Feather.",
   "tooltip.wnir.lighting_post": "Light level 15. +4 radius per post.",
-  "tooltip.wnir.lighting_post.detail": "Brightest possible light in a slender post shape. Loot only.",
-  "tooltip.wnir.hurt_post": "Deals 1 heart per post to nearby hostiles. Bypasses armor.",
-  "tooltip.wnir.hurt_post.detail": "Magic damage every 4 ticks to all enemies in column radius. Stacks: 2 posts = 2 hearts, etc. Loot only.",
+  "tooltip.wnir.lighting_post.detail": "Brightest possible light in a slender post shape. Craft: Warding Post + Glowstone Dust.",
+  "tooltip.wnir.hurt_post": "Deals 1 heart per post to nearby hostiles. Bypasses armor. Adds no radius.",
+  "tooltip.wnir.hurt_post.detail": "Magic damage every 4 ticks to all enemies in column radius. Stacks: 2 posts = 2 hearts, etc. Does not expand the column's radius. Craft: Warding Post + Wooden/Stone Sword.",
   "tooltip.wnir.silencer_post": "Silences entity sounds by 90% within column radius. +4 radius per post.",
-  "tooltip.wnir.silencer_post.detail": "Client-side attenuation. Affects mob sounds, ambient, etc. Stack posts for larger area. Loot only.",
-  "tooltip.wnir.reshaper_post": "Trades horizontal reach for vertical. −2 radius, +1 up/down per post.",
-  "tooltip.wnir.reshaper_post.detail": "Stack with other column posts. Minimum radius clamped to 1. Loot only.",
-  "tooltip.wnir.wither_silencer": "Completely cancels Wither spawn and death sounds in the chunk.",
-  "tooltip.wnir.wither_silencer.detail": "Client-side. One block is enough — sound is silenced across the entire chunk it occupies. Recipe: Silencer Post + Nether Star.",
+  "tooltip.wnir.silencer_post.detail": "Client-side attenuation. Affects mob sounds, ambient, etc. Stack posts for larger area. Craft: Warding Post + Wool.",
+  "tooltip.wnir.reshaper_post": "Trades horizontal reach for vertical. Halves radius, +1 up/down per post.",
+  "tooltip.wnir.reshaper_post.detail": "Each post halves the column's total radius (÷2, ÷4, ÷8…). Minimum radius clamped to 1. Craft: Warding Post + Obsidian.",
+  "tooltip.wnir.wither_silencer": "Cancels Wither spawn/death sounds and silences jukeboxes in the chunk.",
+  "tooltip.wnir.wither_silencer.detail": "Client-side. Wither sounds suppressed dimension-wide if any silencer exists. Jukebox music suppressed within the same chunk as the silencer. Recipe: Silencer Post + Nether Star.",
 
   "tooltip.wnir.antiwither": "Immune to all explosions. Nearly indestructible.",
   "tooltip.wnir.antiwither.detail": "Hardness 50, blast resistance 3,600,000. Requires a pickaxe.",
@@ -158,5 +158,24 @@
   "tooltip.wnir.wireless_fuel.detail": "Shift+right-click an energy block to link. 4,000 FE per burn cycle. Never consumed.",
 
   "tooltip.wnir.magic_cellulose_bucket": "Magic Cellulose fluid from the Celluloser.",
-  "tooltip.wnir.magic_cellulose_bucket.detail": "Pour into the world or use in recipes. Empty bucket returned."
+  "tooltip.wnir.magic_cellulose_bucket.detail": "Pour into the world or use in recipes. Empty bucket returned.",
+
+  "block.wnir.trader": "Trader",
+  "item.wnir.trader": "Trader",
+  "container.wnir.trader": "Trader",
+  "tooltip.wnir.trader": "Automates villager trades. Triggered by redstone.",
+  "tooltip.wnir.trader.detail": "Right-click to configure. Rescan to discover nearby villagers. Check trades to automate. Requires inventory below. Consumes Magic Cellulose to restock depleted trades.",
+
+  "gui.wnir.trader.rescan": "Rescan",
+  "gui.wnir.trader.give_xp": "Give XP",
+  "gui.wnir.trader.no_traders": "No traders found.",
+  "gui.wnir.trader.select_trader": "Select a trader.",
+  "gui.wnir.trader.no_trades": "No trades available.",
+  "gui.wnir.trader.not_loaded": "Trader not in range.",
+  "gui.wnir.trader.no_inventory": "No inventory below!",
+  "gui.wnir.trader.glow_villager": "Glow villager (1 min) — costs 1 XP",
+
+  "item.wnir.nbt_wiper_liquid": "NBT Wiper",
+  "tooltip.wnir.nbt_wiper_liquid": "Strips all data from an item.",
+  "tooltip.wnir.nbt_wiper_liquid.detail": "Craft with any item to remove enchantments, names, and all other data. Returns a brand-new copy. Crafted from Magic Cellulose + 3 Glass Bottles → 3 wipers."
 }

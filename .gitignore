@@ -20,6 +20,13 @@ run/
 runs/
 src/main/generated/
 src/test/generated/
+# Gradle userdev extraction artifacts
+net/
+META-INF/
+assets/
+reports/
+*.png
+!src/main/resources/**/*.png
 
 # OS
 .DS_Store

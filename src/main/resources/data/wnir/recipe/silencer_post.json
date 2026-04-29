@@ -1,0 +1,12 @@
+{
+  "type": "minecraft:crafting_shapeless",
+  "category": "misc",
+  "ingredients": [
+    "wnir:warding_post",
+    "#minecraft:wool"
+  ],
+  "result": {
+    "id": "wnir:silencer_post",
+    "count": 1
+  }
+}

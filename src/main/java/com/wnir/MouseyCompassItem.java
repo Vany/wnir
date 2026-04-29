@@ -80,8 +80,7 @@ public final class MouseyCompassItem extends Item {
                 String name = offhand.get(DataComponents.CUSTOM_NAME).getString();
                 Block block = findBlockByName(name);
                 if (block == null || block == Blocks.AIR) {
-                    player.displayClientMessage(
-                        Component.literal("No block named '" + name + "'"), true);
+                    player.sendOverlayMessage(Component.literal("No block named '" + name + "'"));
                     return InteractionResult.FAIL;
                 }
                 Identifier targetId = BuiltInRegistries.BLOCK.getKey(block);
@@ -92,8 +91,7 @@ public final class MouseyCompassItem extends Item {
         }
 
         if (!level.isClientSide()) {
-            player.displayClientMessage(
-                Component.literal("Hold a block or a named paper in your offhand to search"), true);
+            player.sendOverlayMessage(Component.literal("Hold a block or a named paper in your offhand to search"));
         }
         return InteractionResult.FAIL;
     }
@@ -119,8 +117,9 @@ public final class MouseyCompassItem extends Item {
         Identifier targetId = getTargetId(main);
         if (targetId == null) { cancelSearch(player); return; }
 
+        BlockPos ppos = player.blockPosition();
         MouseyCompassSearchManager.TickResult result = MouseyCompassSearchManager.tick(
-            player.getUUID(), level, new ChunkPos(player.blockPosition())
+            player.getUUID(), level, new ChunkPos(ppos.getX() >> 4, ppos.getZ() >> 4)
         );
 
         // Point needle at current scanned chunk
@@ -136,20 +135,17 @@ public final class MouseyCompassItem extends Item {
 
         // Caption when radius ring increases
         if (result.newRadius() > 0) {
-            player.displayClientMessage(
-                Component.literal("Searching... " + result.newRadius() + " chunks"), true);
+            player.sendOverlayMessage(Component.literal("Searching... " + result.newRadius() + " chunks"));
         }
 
         if (result.found() != null) {
             lock(main, result.found(), level.dimension());
-            player.displayClientMessage(
-                Component.literal("Found at " + result.found().getX() + ", " + result.found().getY() + ", " + result.found().getZ()),
-                true
-            );
+            player.sendOverlayMessage(Component.literal(
+                "Found at " + result.found().getX() + ", " + result.found().getY() + ", " + result.found().getZ()));
         } else if (!MouseyCompassSearchManager.isSearching(player.getUUID())) {
             // Search exhausted without finding
             clearSearching(main);
-            player.displayClientMessage(Component.literal("Block not found"), true);
+            player.sendOverlayMessage(Component.literal("Block not found"));
         }
     }
 
@@ -211,12 +207,11 @@ public final class MouseyCompassItem extends Item {
         stack.set(DataComponents.LODESTONE_TRACKER, new LodestoneTracker(Optional.empty(), false));
         stack.remove(DataComponents.ENCHANTMENT_GLINT_OVERRIDE);
 
+        BlockPos startPos = player.blockPosition();
         MouseyCompassSearchManager.startSearch(
-            player.getUUID(), targetId, new ChunkPos(player.blockPosition())
+            player.getUUID(), targetId, new ChunkPos(startPos.getX() >> 4, startPos.getZ() >> 4)
         );
-        player.displayClientMessage(
-            Component.literal("Searching for " + targetId.getPath() + "..."), true
-        );
+        player.sendOverlayMessage(Component.literal("Searching for " + targetId.getPath() + "..."));
     }
 
     private static void lock(ItemStack stack, BlockPos pos, ResourceKey<Level> dimension) {

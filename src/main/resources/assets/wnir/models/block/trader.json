@@ -1,0 +1,12 @@
+{
+  "parent": "minecraft:block/cube",
+  "textures": {
+    "up":       "wnir:block/trader_top",
+    "down":     "wnir:block/trader_bottom",
+    "north":    "wnir:block/trader_side",
+    "south":    "wnir:block/trader_side",
+    "west":     "wnir:block/trader_side",
+    "east":     "wnir:block/trader_side",
+    "particle": "wnir:block/trader_side"
+  }
+}
