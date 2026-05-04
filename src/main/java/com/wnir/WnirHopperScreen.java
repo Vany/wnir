@@ -31,6 +31,7 @@ public class WnirHopperScreen extends AbstractContainerScreen<WnirHopperMenu> {
     @Override
     public void extractContents(GuiGraphicsExtractor g, int mouseX, int mouseY, float partialTick) {
         g.blit(RenderPipelines.GUI_TEXTURED, background, leftPos, topPos, 0f, 0f, imageWidth, imageHeight, 256, 256);
+        super.extractContents(g, mouseX, mouseY, partialTick);
     }
 
     /** Returns a screen constructor for use with {@link RegisterMenuScreensEvent#register}. */

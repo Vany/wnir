@@ -1,12 +1,25 @@
 package com.wnir;
 
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.world.item.Items;
+import net.minecraft.world.item.alchemy.Potions;
+import net.minecraft.world.level.block.entity.SpawnerBlockEntity;
 import net.neoforged.bus.api.EventPriority;
 import net.neoforged.bus.api.IEventBus;
 import net.neoforged.fml.ModContainer;
 import net.neoforged.fml.common.Mod;
+import net.neoforged.fml.event.lifecycle.FMLClientSetupEvent;
 import net.neoforged.neoforge.capabilities.Capabilities;
 import net.neoforged.neoforge.capabilities.RegisterCapabilitiesEvent;
 import net.neoforged.neoforge.common.NeoForge;
+import net.neoforged.neoforge.event.brewing.RegisterBrewingRecipesEvent;
+import net.neoforged.neoforge.event.entity.living.FinalizeSpawnEvent;
+import net.neoforged.neoforge.event.level.BlockEvent;
+import net.neoforged.neoforge.event.level.LevelEvent;
+import net.neoforged.neoforge.event.server.ServerAboutToStartEvent;
+import net.neoforged.neoforge.event.server.ServerStartingEvent;
+import net.neoforged.neoforge.event.server.ServerStoppingEvent;
+import net.neoforged.neoforge.network.event.RegisterPayloadHandlersEvent;
 import net.neoforged.neoforge.transfer.item.VanillaContainerWrapper;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
@@ -20,75 +33,9 @@ public class WnirMod {
     public WnirMod(IEventBus modEventBus, ModContainer modContainer) {
         WnirRegistries.register(modEventBus);
 
-        modEventBus.addListener((net.neoforged.neoforge.network.event.RegisterPayloadHandlersEvent event) -> {
-            event.registrar(MOD_ID)
-                .playToClient(
-                    TraderPayloads.TraderSyncPayload.TYPE,
-                    TraderPayloads.TraderSyncPayload.STREAM_CODEC,
-                    TraderPayloads.TraderSyncPayload::handle)
-                .playToServer(
-                    TraderPayloads.TraderActionPayload.TYPE,
-                    TraderPayloads.TraderActionPayload.STREAM_CODEC,
-                    TraderPayloads.TraderActionPayload::handle);
-        });
-
-        modEventBus.addListener((RegisterCapabilitiesEvent event) -> {
-            event.registerBlockEntity(
-                Capabilities.Item.BLOCK,
-                WnirRegistries.SKULL_BEEHIVE_BE.get(),
-                (be, side) -> VanillaContainerWrapper.of(be)
-            );
-            event.registerBlockEntity(
-                Capabilities.Item.BLOCK,
-                WnirRegistries.STEEL_HOPPER_BE.get(),
-                (be, side) -> VanillaContainerWrapper.of(be)
-            );
-            event.registerBlockEntity(
-                Capabilities.Item.BLOCK,
-                WnirRegistries.MOSSY_HOPPER_BE.get(),
-                (be, side) -> VanillaContainerWrapper.of(be)
-            );
-            event.registerBlockEntity(
-                Capabilities.Item.BLOCK,
-                WnirRegistries.NETHER_HOPPER_BE.get(),
-                (be, side) -> VanillaContainerWrapper.of(be)
-            );
-            event.registerBlockEntity(
-                Capabilities.Item.BLOCK,
-                WnirRegistries.CELLULOSER_BE.get(),
-                (be, side) -> VanillaContainerWrapper.of(be)
-            );
-            event.registerBlockEntity(
-                Capabilities.Energy.BLOCK,
-                WnirRegistries.CELLULOSER_BE.get(),
-                (be, side) -> be.energyHandler
-            );
-            event.registerBlockEntity(
-                Capabilities.Energy.BLOCK,
-                WnirRegistries.ACCUMULATOR_BE.get(),
-                (be, side) -> be.energyHandler
-            );
-            event.registerBlockEntity(
-                Capabilities.Fluid.BLOCK,
-                WnirRegistries.CELLULOSER_BE.get(),
-                (be, side) -> be.fluidHandler
-            );
-            event.registerBlockEntity(
-                Capabilities.Fluid.BLOCK,
-                WnirRegistries.SPAWNER_BE.get(),
-                (be, side) -> be.fluidHandler
-            );
-            event.registerBlockEntity(
-                Capabilities.Fluid.BLOCK,
-                WnirRegistries.TRADER_BE.get(),
-                (be, side) -> be.fluidHandler
-            );
-            event.registerBlockEntity(
-                Capabilities.Item.BLOCK,
-                WnirRegistries.TRADER_BE.get(),
-                (be, side) -> VanillaContainerWrapper.of(be)
-            );
-        });
+        modEventBus.addListener(this::onRegisterPayloads);
+        modEventBus.addListener(this::onRegisterCapabilities);
+        modEventBus.addListener(this::onClientSetup);
 
         NeoForge.EVENT_BUS.addListener(BlockDeleteHandler::onChunkLoad);
         NeoForge.EVENT_BUS.addListener(MartialLightningHandler::onLivingIncomingDamage);
@@ -108,89 +55,143 @@ public class WnirMod {
         NeoForge.EVENT_BUS.addListener(WirelessFuelItem::onFurnaceFuelBurnTime);
         NeoForge.EVENT_BUS.addListener(SilenceHandler::onVanillaGameEvent);
         NeoForge.EVENT_BUS.addListener(SpawnerAgitatorBlockEntity::onServerTick);
-        NeoForge.EVENT_BUS.addListener((net.neoforged.neoforge.event.entity.living.FinalizeSpawnEvent e) -> {
-            var spawnerOpt = e.getSpawner();
-            if (spawnerOpt == null) return;
-            // left = BlockEntity (spawner block), right = Entity (mob summoner) — only act on spawner blocks
-            spawnerOpt.ifLeft(be -> {
-                if (be instanceof net.minecraft.world.level.block.entity.SpawnerBlockEntity
-                        && SpawnerAgitatorBlockEntity.isAgitatedSpawnerAt(be.getBlockPos())) {
-                    e.getEntity().setPersistenceRequired();
-                }
-            });
-        });
+        NeoForge.EVENT_BUS.addListener(this::onFinalizeSpawn);
         NeoForge.EVENT_BUS.addListener(WardingPostEnchantHandler::onEnchantItem);
-        NeoForge.EVENT_BUS.addListener(
-            EventPriority.LOWEST, WardingPostTeleportHandler::onEntityTeleport
-        );
-        // Client-only: register sound handlers via FMLClientSetupEvent to avoid loading client classes on server
-        modEventBus.addListener((net.neoforged.fml.event.lifecycle.FMLClientSetupEvent e) -> {
-            NeoForge.EVENT_BUS.addListener(SilencerHandler::onPlaySound);
-            NeoForge.EVENT_BUS.addListener(WitherSilencerHandler::onPlaySound);
-        });
-        NeoForge.EVENT_BUS.addListener(
-            (net.neoforged.neoforge.event.level.BlockEvent.EntityPlaceEvent e) -> {
-                if (!(e.getLevel() instanceof net.minecraft.server.level.ServerLevel level)) return;
-                EEClockBuddingCrystalBlock.tryTransformAt(level, e.getPos());
-                TeleporterCrystalBlock.tryTransformAt(level, e.getPos());
-            }
-        );
+        NeoForge.EVENT_BUS.addListener(EventPriority.LOWEST, WardingPostTeleportHandler::onEntityTeleport);
+        NeoForge.EVENT_BUS.addListener(this::onBlockPlaced);
+        NeoForge.EVENT_BUS.addListener(this::onRegisterBrewingRecipes);
+        NeoForge.EVENT_BUS.addListener(this::onServerAboutToStart);
+        NeoForge.EVENT_BUS.addListener(this::onLevelLoad);
+        NeoForge.EVENT_BUS.addListener(this::onServerStarting);
+        NeoForge.EVENT_BUS.addListener(this::onServerStopping);
+    }
 
-        NeoForge.EVENT_BUS.addListener(
-            (net.neoforged.neoforge.event.brewing.RegisterBrewingRecipesEvent e) -> {
-                e.getBuilder().addMix(
-                    net.minecraft.world.item.alchemy.Potions.AWKWARD,
-                    net.minecraft.world.item.Items.BOOK,
-                    WnirRegistries.MEGA_CHANTER_POTION
-                );
-                e.getBuilder().addMix(
-                    net.minecraft.world.item.alchemy.Potions.AWKWARD,
-                    net.minecraft.world.item.Items.GOLDEN_SWORD,
-                    WnirRegistries.MARTIAL_LIGHTNING_POTION
-                );
-                e.getBuilder().addMix(
-                    net.minecraft.world.item.alchemy.Potions.AWKWARD,
-                    net.minecraft.world.item.Items.WHITE_WOOL,
-                    WnirRegistries.SILENCE_POTION
-                );
-                e.getBuilder().addMix(
-                    WnirRegistries.SILENCE_POTION,
-                    net.minecraft.world.item.Items.GLOWSTONE_DUST,
-                    WnirRegistries.STRONG_SILENCE_POTION
-                );
-            }
-        );
+    private void onRegisterPayloads(RegisterPayloadHandlersEvent event) {
+        event.registrar(MOD_ID)
+            .playToClient(
+                TraderPayloads.TraderSyncPayload.TYPE,
+                TraderPayloads.TraderSyncPayload.STREAM_CODEC,
+                TraderPayloads.TraderSyncPayload::handle)
+            .playToServer(
+                TraderPayloads.TraderActionPayload.TYPE,
+                TraderPayloads.TraderActionPayload.STREAM_CODEC,
+                TraderPayloads.TraderActionPayload::handle);
+    }
 
-        // Load block-delete config before any chunks load (spawn chunks load during ServerStarting)
-        NeoForge.EVENT_BUS.addListener(
-            (net.neoforged.neoforge.event.server.ServerAboutToStartEvent e) -> {
-                CelluloserConfig.load();
-                BlockDeleteConfig.load();
-            }
+    private void onRegisterCapabilities(RegisterCapabilitiesEvent event) {
+        event.registerBlockEntity(
+            Capabilities.Item.BLOCK,
+            WnirRegistries.SKULL_BEEHIVE_BE.get(),
+            (be, side) -> VanillaContainerWrapper.of(be)
         );
-        // Re-force chunks whenever any dimension loads (handles lazy/custom dimensions too)
-        NeoForge.EVENT_BUS.addListener(
-            (net.neoforged.neoforge.event.level.LevelEvent.Load e) -> {
-                if (e.getLevel() instanceof net.minecraft.server.level.ServerLevel level) {
-                    ChunkLoaderData.get(level).forceAll(level);
-                }
-            }
+        event.registerBlockEntity(
+            Capabilities.Item.BLOCK,
+            WnirRegistries.STEEL_HOPPER_BE.get(),
+            (be, side) -> VanillaContainerWrapper.of(be)
         );
-        NeoForge.EVENT_BUS.addListener(
-            (net.neoforged.neoforge.event.server.ServerStartingEvent e) -> onServerStarting(e)
+        event.registerBlockEntity(
+            Capabilities.Item.BLOCK,
+            WnirRegistries.MOSSY_HOPPER_BE.get(),
+            (be, side) -> VanillaContainerWrapper.of(be)
         );
-        NeoForge.EVENT_BUS.addListener(
-            (net.neoforged.neoforge.event.server.ServerStoppingEvent e) -> onServerStopping(e)
+        event.registerBlockEntity(
+            Capabilities.Item.BLOCK,
+            WnirRegistries.NETHER_HOPPER_BE.get(),
+            (be, side) -> VanillaContainerWrapper.of(be)
+        );
+        event.registerBlockEntity(
+            Capabilities.Item.BLOCK,
+            WnirRegistries.CELLULOSER_BE.get(),
+            (be, side) -> VanillaContainerWrapper.of(be)
+        );
+        event.registerBlockEntity(
+            Capabilities.Energy.BLOCK,
+            WnirRegistries.CELLULOSER_BE.get(),
+            (be, side) -> be.energyHandler
+        );
+        event.registerBlockEntity(
+            Capabilities.Energy.BLOCK,
+            WnirRegistries.ACCUMULATOR_BE.get(),
+            (be, side) -> be.energyHandler
+        );
+        event.registerBlockEntity(
+            Capabilities.Fluid.BLOCK,
+            WnirRegistries.CELLULOSER_BE.get(),
+            (be, side) -> be.fluidHandler
+        );
+        event.registerBlockEntity(
+            Capabilities.Fluid.BLOCK,
+            WnirRegistries.SPAWNER_BE.get(),
+            (be, side) -> be.fluidHandler
+        );
+        event.registerBlockEntity(
+            Capabilities.Fluid.BLOCK,
+            WnirRegistries.TRADER_BE.get(),
+            (be, side) -> be.fluidHandler
+        );
+        event.registerBlockEntity(
+            Capabilities.Fluid.BLOCK,
+            WnirRegistries.OPAQUE_TANK_BE.get(),
+            (be, side) -> be.fluidHandler
+        );
+        event.registerBlockEntity(
+            Capabilities.Item.BLOCK,
+            WnirRegistries.TRADER_BE.get(),
+            (be, side) -> VanillaContainerWrapper.of(be)
         );
     }
 
-    private void onServerStarting(net.neoforged.neoforge.event.server.ServerStartingEvent event) {
+    // Client-only: register sound handlers via FMLClientSetupEvent to avoid loading client classes on server
+    private void onClientSetup(FMLClientSetupEvent event) {
+        NeoForge.EVENT_BUS.addListener(SilencerHandler::onPlaySound);
+        NeoForge.EVENT_BUS.addListener(WitherSilencerHandler::onPlaySound);
+    }
+
+    private void onFinalizeSpawn(FinalizeSpawnEvent event) {
+        var spawnerOpt = event.getSpawner();
+        if (spawnerOpt == null) return;
+        // left = BlockEntity (spawner block), right = Entity (mob summoner) — only act on spawner blocks
+        spawnerOpt.ifLeft(be -> {
+            if (be instanceof SpawnerBlockEntity
+                    && SpawnerAgitatorBlockEntity.isAgitatedSpawnerAt(be.getBlockPos())) {
+                event.getEntity().setPersistenceRequired();
+            }
+        });
+    }
+
+    private void onBlockPlaced(BlockEvent.EntityPlaceEvent event) {
+        if (!(event.getLevel() instanceof ServerLevel level)) return;
+        EEClockBuddingCrystalBlock.tryTransformAt(level, event.getPos());
+        TeleporterCrystalBlock.tryTransformAt(level, event.getPos());
+    }
+
+    private void onRegisterBrewingRecipes(RegisterBrewingRecipesEvent event) {
+        event.getBuilder().addMix(Potions.AWKWARD, Items.BOOK,         WnirRegistries.MEGA_CHANTER_POTION);
+        event.getBuilder().addMix(Potions.AWKWARD, Items.GOLDEN_SWORD, WnirRegistries.MARTIAL_LIGHTNING_POTION);
+        event.getBuilder().addMix(Potions.AWKWARD, Items.WHITE_WOOL,   WnirRegistries.SILENCE_POTION);
+        event.getBuilder().addMix(WnirRegistries.SILENCE_POTION, Items.GLOWSTONE_DUST, WnirRegistries.STRONG_SILENCE_POTION);
+    }
+
+    // Load configs before any chunks load (spawn chunks load during ServerStarting)
+    private void onServerAboutToStart(ServerAboutToStartEvent event) {
+        CelluloserConfig.load();
+        BlockDeleteConfig.load();
+    }
+
+    // Re-force chunks whenever any dimension loads (handles lazy/custom dimensions too)
+    private void onLevelLoad(LevelEvent.Load event) {
+        if (event.getLevel() instanceof ServerLevel level) {
+            ChunkLoaderData.get(level).forceAll(level);
+        }
+    }
+
+    private void onServerStarting(ServerStartingEvent event) {
         // Pre-load personal dimension manager so biome source map is populated before any player joins
         PersonalDimensionManager.get(event.getServer());
-        // configs already loaded in ServerAboutToStartEvent
+        // configs already loaded in onServerAboutToStart
     }
 
-    private void onServerStopping(net.neoforged.neoforge.event.server.ServerStoppingEvent event) {
+    private void onServerStopping(ServerStoppingEvent event) {
         BlockDeleteConfig.pruneDeleted();
         SpawnerAgitatorBlockEntity.unbindAll();
         WardingColumnBlockEntity.clearRegistry();

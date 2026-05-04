@@ -25,6 +25,7 @@ net/
 META-INF/
 assets/
 reports/
+neoforge.mixins.json
 *.png
 !src/main/resources/**/*.png
 

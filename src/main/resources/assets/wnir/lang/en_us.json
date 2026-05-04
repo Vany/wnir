@@ -160,6 +160,11 @@
   "tooltip.wnir.magic_cellulose_bucket": "Magic Cellulose fluid from the Celluloser.",
   "tooltip.wnir.magic_cellulose_bucket.detail": "Pour into the world or use in recipes. Empty bucket returned.",
 
+  "block.wnir.opaque_tank": "Opaque Tank",
+  "item.wnir.opaque_tank": "Opaque Tank",
+  "tooltip.wnir.opaque_tank": "Stores any fluid. Base capacity: 16,000 mB.",
+  "tooltip.wnir.opaque_tank.detail": "Right-click with a bucket to fill or drain. Right-click with empty hand to check contents. Combine multiple tanks in a crafting grid to merge capacity and fluid.",
+
   "block.wnir.trader": "Trader",
   "item.wnir.trader": "Trader",
   "container.wnir.trader": "Trader",

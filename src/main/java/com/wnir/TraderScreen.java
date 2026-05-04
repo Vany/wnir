@@ -143,6 +143,7 @@ public class TraderScreen extends AbstractContainerScreen<TraderMenu> {
 
         // Title
         g.text(font, this.title, lx + TL_X, ty - 2, COL_TEXT, false);
+        super.extractContents(g, mouseX, mouseY, partial);
     }
 
     // ── Tank ──────────────────────────────────────────────────────────────────

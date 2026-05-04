@@ -10,7 +10,7 @@ import net.minecraft.world.entity.player.Inventory;
 import java.util.Optional;
 
 /**
- * Celluloser GUI (176×166).
+ * Celluloser GUI (176×190).
  *
  * Layout (left to right):
  *   [8,14]  Energy bar    16×56 frame, 14×54 fill
@@ -44,7 +44,7 @@ public class CelluloserScreen extends AbstractContainerScreen<CelluloserMenu> {
     private static final int ARR_X = 101, ARR_Y = 38; // progress arrow
 
     public CelluloserScreen(CelluloserMenu menu, Inventory playerInv, Component title) {
-        super(menu, playerInv, title, 176, 166);
+        super(menu, playerInv, title, 176, 190);
         this.titleLabelX = 8;
         this.titleLabelY = 4;
         this.inventoryLabelY = this.imageHeight + 10;  // push off-screen — no "Inventory" label
@@ -101,11 +101,7 @@ public class CelluloserScreen extends AbstractContainerScreen<CelluloserMenu> {
                     arrowW, ARR_FILL_H, 256, 256);
             }
         }
-    }
-
-    @Override
-    protected void extractLabels(GuiGraphicsExtractor g, int mouseX, int mouseY) {
-        super.extractLabels(g, mouseX, mouseY);
+        super.extractContents(g, mouseX, mouseY, partialTick);
     }
 
     @Override

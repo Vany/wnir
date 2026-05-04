@@ -1,0 +1,17 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "pattern": [
+    "PGP",
+    "GIG",
+    "PGP"
+  ],
+  "key": {
+    "P": "minecraft:oak_planks",
+    "G": "minecraft:glass",
+    "I": "minecraft:iron_bars"
+  },
+  "result": {
+    "id": "wnir:opaque_tank",
+    "count": 1
+  }
+}

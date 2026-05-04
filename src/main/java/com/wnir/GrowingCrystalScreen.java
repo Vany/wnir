@@ -50,6 +50,7 @@ public class GrowingCrystalScreen extends AbstractContainerScreen<GrowingCrystal
                    leftPos + BAR_PROG_X + progFilled, topPos + BAR_PROG_Y + BAR_PROG_H,
                    colorProgress);
         }
+        super.extractContents(g, mouseX, mouseY, partialTick);
     }
 
     @Override

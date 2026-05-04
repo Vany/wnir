@@ -58,6 +58,7 @@ public class SkullBeehiveScreen extends AbstractContainerScreen<SkullBeehiveMenu
             leftPos + BAR_X, topPos + BAR_GUNPOWDER_Y,
             menu.data.get(1), SkullBeehiveBlockEntity.MAX_AMMO,
             COLOR_GUN_FULL, COLOR_GUN_EMPTY);
+        super.extractContents(g, mouseX, mouseY, partialTick);
     }
 
     @Override

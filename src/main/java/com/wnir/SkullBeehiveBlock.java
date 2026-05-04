@@ -2,6 +2,8 @@ package com.wnir;
 
 import com.mojang.serialization.MapCodec;
 import net.minecraft.core.BlockPos;
+import net.minecraft.core.component.DataComponents;
+import net.minecraft.nbt.CompoundTag;
 import net.minecraft.world.InteractionResult;
 import net.minecraft.world.entity.LivingEntity;
 import org.jetbrains.annotations.Nullable;
@@ -9,6 +11,7 @@ import net.minecraft.world.entity.item.ItemEntity;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.entity.projectile.arrow.AbstractArrow;
 import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.component.TypedEntityData;
 import net.minecraft.world.level.BlockGetter;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.BaseEntityBlock;
@@ -99,7 +102,8 @@ public class SkullBeehiveBlock extends BaseEntityBlock {
         BlockEntity be = level.getBlockEntity(pos);
         if (be instanceof SkullBeehiveBlockEntity sbbe && !level.isClientSide() && player.preventsBlockDrops()) {
             ItemStack stack = new ItemStack(this);
-            stack.applyComponents(be.collectComponents());
+            CompoundTag tag = be.saveCustomOnly(level.registryAccess());
+            stack.set(DataComponents.BLOCK_ENTITY_DATA, TypedEntityData.of(be.getType(), tag));
             ItemEntity entity = new ItemEntity(level, pos.getX() + 0.5, pos.getY() + 0.5, pos.getZ() + 0.5, stack);
             entity.setDefaultPickUpDelay();
             level.addFreshEntity(entity);
@@ -117,7 +121,8 @@ public class SkullBeehiveBlock extends BaseEntityBlock {
             BlockEntity be = level.getBlockEntity(pos);
             if (be instanceof SkullBeehiveBlockEntity) {
                 ItemStack stack = new ItemStack(this);
-                stack.applyComponents(be.collectComponents());
+                CompoundTag tag = be.saveCustomOnly(level.registryAccess());
+                stack.set(DataComponents.BLOCK_ENTITY_DATA, TypedEntityData.of(be.getType(), tag));
                 level.removeBlock(pos, false);
                 if (!player.getInventory().add(stack)) {
                     // Inventory full — drop at player's feet

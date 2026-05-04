@@ -183,6 +183,9 @@ public final class WnirRegistries {
     public static final Supplier<RecipeSerializer<NbtWiperRecipe>> NBT_WIPER_RECIPE =
         RECIPE_SERIALIZERS.register("nbt_wiper", () -> NbtWiperRecipe.SERIALIZER);
 
+    public static final Supplier<RecipeSerializer<OpaqueTankCombineRecipe>> OPAQUE_TANK_COMBINE_RECIPE =
+        RECIPE_SERIALIZERS.register("opaque_tank_combine", () -> OpaqueTankCombineRecipe.SERIALIZER);
+
     @SuppressWarnings("unchecked")
     private static final DeferredRegister<MenuType<?>> MENU_TYPES =
         DeferredRegister.create(
@@ -374,6 +377,15 @@ public final class WnirRegistries {
                 .requiresCorrectToolForDrops(),
             (b, p) -> new WnirBlockItem(b, p, "skull_beehive"));
 
+    private static final BlockBundle<OpaqueTankBlock, OpaqueTankBlockEntity> OPAQUE_TANK =
+        registerBlock("opaque_tank", OpaqueTankBlock::new, OpaqueTankBlockEntity::new,
+            BlockBehaviour.Properties.of()
+                .mapColor(MapColor.STONE)
+                .sound(SoundType.STONE)
+                .strength(2.5f)
+                .requiresCorrectToolForDrops(),
+            (b, p) -> new WnirBlockItem(b, p, "opaque_tank", WnirBlockItem::opaqueTankHeaderLines, null));
+
     private static final BlockBundle<AccumulatorBlock, AccumulatorBlockEntity> ACCUMULATOR =
         registerBlock("accumulator", AccumulatorBlock::new, AccumulatorBlockEntity::new,
             BlockBehaviour.Properties.of()
@@ -560,6 +572,10 @@ public final class WnirRegistries {
     public static final Supplier<AccumulatorBlock> ACCUMULATOR_BLOCK = ACCUMULATOR.block;
     public static final Supplier<BlockItem> ACCUMULATOR_ITEM = ACCUMULATOR.item;
 
+    public static final Supplier<BlockEntityType<OpaqueTankBlockEntity>> OPAQUE_TANK_BE = OPAQUE_TANK.entity;
+    public static final Supplier<OpaqueTankBlock> OPAQUE_TANK_BLOCK = OPAQUE_TANK.block;
+    public static final Supplier<BlockItem> OPAQUE_TANK_ITEM = OPAQUE_TANK.item;
+
     public static final Supplier<BlockItem> CHUNK_LOADER_ITEM = CHUNK_LOADER.item;
     public static final Supplier<BlockItem> SPAWNER_AGITATOR_ITEM = SPAWNER_AGITATOR.item;
     public static final Supplier<BlockItem> WARDING_POST_ITEM = WARDING_POST.item;
@@ -612,6 +628,7 @@ public final class WnirRegistries {
                     output.accept(MAGIC_CELLULOSE_BUCKET.get());
                     output.accept(CELLULOSER_ITEM.get());
                     output.accept(ACCUMULATOR_ITEM.get());
+                    output.accept(OPAQUE_TANK_ITEM.get());
                     output.accept(SPAWNER_ITEM.get());
                     output.accept(TRADER_ITEM.get());
                 })

@@ -1,8 +1,10 @@
 package com.wnir;
 
 import net.minecraft.ChatFormatting;
+import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.network.chat.Component;
+import net.minecraft.resources.Identifier;
 import net.minecraft.world.item.BlockItem;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
@@ -113,6 +115,32 @@ public class WnirBlockItem extends BlockItem {
             .withStyle(ChatFormatting.BLUE));
         out.accept(Component.literal("Magic Cellulose: " + celluloseMb + " / " + tankCap + " mB")
             .withStyle(ChatFormatting.LIGHT_PURPLE));
+    }
+
+    static void opaqueTankHeaderLines(CompoundTag tag, Consumer<Component> out) {
+        long capacity = tag.getLong("capacity").orElse((long) OpaqueTankBlockEntity.BASE_CAPACITY);
+        long amount   = tag.getLong("fluid_amount").orElse(0L);
+        String fluidId = tag.getString("fluid_id").orElse("");
+
+        if (fluidId.isEmpty() || amount == 0) {
+            out.accept(Component.literal("Empty")
+                .withStyle(ChatFormatting.GRAY)
+                .append(Component.literal(" (" + capacity + " mB capacity)")
+                    .withStyle(ChatFormatting.DARK_GRAY)));
+        } else {
+            double fill = capacity > 0 ? (double) amount / capacity : 0;
+            ChatFormatting color = fill > 0.66 ? ChatFormatting.GREEN
+                                 : fill > 0.33 ? ChatFormatting.YELLOW
+                                 :               ChatFormatting.RED;
+            String name = fluidId;
+            Identifier id = Identifier.tryParse(fluidId);
+            if (id != null) {
+                var opt = BuiltInRegistries.FLUID.getOptional(id);
+                if (opt.isPresent()) name = opt.get().getFluidType().getDescription().getString();
+            }
+            out.accept(Component.literal(name + ": " + amount + " / " + capacity + " mB")
+                .withStyle(color));
+        }
     }
 
     static String formatFe(long fe) {
