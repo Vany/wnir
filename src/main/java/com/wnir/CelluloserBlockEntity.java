@@ -402,12 +402,18 @@ public class CelluloserBlockEntity extends BlockEntity implements Container, net
         }
 
         // ── Crafting recipes ─────────────────────────────────────────────────
-        // ShapedRecipe/ShapelessRecipe.assemble ignores input and returns stored result copy
+        // Vanilla shaped/shapeless recipes ignore the input and return the stored result.
+        // Modded recipes may index into the input and crash on CraftingInput.EMPTY — skip those.
         Collection<RecipeHolder<CraftingRecipe>> craftingRecipes = rm.recipeMap().byType(RecipeType.CRAFTING);
         for (RecipeHolder<CraftingRecipe> holder : craftingRecipes) {
             CraftingRecipe recipe = holder.value();
 
-            ItemStack result = recipe.assemble(CraftingInput.EMPTY);
+            ItemStack result;
+            try {
+                result = recipe.assemble(CraftingInput.EMPTY);
+            } catch (Exception e) {
+                continue;
+            }
             if (result.isEmpty() || result.getItem() != target) continue;
 
             // Skip repair/upgrade recipes that contain equipped-slot items as ingredients
