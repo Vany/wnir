@@ -1,10 +1,13 @@
 package com.wnir;
 
+import net.minecraft.client.renderer.block.FluidModel;
+import net.minecraft.client.resources.model.sprite.Material;
 import net.minecraft.resources.Identifier;
 import net.neoforged.api.distmarker.Dist;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.common.EventBusSubscriber;
 import net.neoforged.neoforge.client.event.EntityRenderersEvent;
+import net.neoforged.neoforge.client.event.RegisterFluidModelsEvent;
 import net.neoforged.neoforge.client.extensions.common.RegisterClientExtensionsEvent;
 import net.neoforged.neoforge.client.event.RegisterMenuScreensEvent;
 import net.neoforged.neoforge.client.event.RegisterSpecialModelRendererEvent;
@@ -32,16 +35,27 @@ public class WnirClientSetup {
     }
 
     @SubscribeEvent
+    public static void onRegisterFluidModels(RegisterFluidModelsEvent event) {
+        event.register(
+            new FluidModel.Unbaked(
+                new Material(Identifier.fromNamespaceAndPath(WnirMod.MOD_ID, "block/magic_cellulose_still")),
+                new Material(Identifier.fromNamespaceAndPath(WnirMod.MOD_ID, "block/magic_cellulose_flow")),
+                null,  // no overlay
+                null   // no tint source — texture has color baked in
+            ),
+            WnirRegistries.MAGIC_CELLULOSE_STILL,
+            WnirRegistries.MAGIC_CELLULOSE_FLOWING
+        );
+    }
+
+    @SubscribeEvent
     public static void onRegisterClientExtensions(RegisterClientExtensionsEvent event) {
         event.registerFluidType(
             new IClientFluidTypeExtensions() {
-                // In NeoForge 26, IClientFluidTypeExtensions no longer has still/flow/tint methods.
-                // Provide pale-pink fog color when the player is submerged in this fluid.
-                @Override
-                public void modifyFogColor(net.minecraft.client.Camera camera, float partialTick,
+                public org.joml.Vector3f modifyFogColor(net.minecraft.client.Camera camera, float partialTick,
                         net.minecraft.client.multiplayer.ClientLevel level, int renderDistance,
-                        float darkenWorldAmount, org.joml.Vector4f fluidFogColor) {
-                    fluidFogColor.set(1.0f, 0.70f, 0.85f, 1.0f); // pale pink
+                        float darkenWorldAmount, org.joml.Vector3f fluidFogColor) {
+                    return fluidFogColor.set(1.0f, 0.70f, 0.85f);
                 }
             },
             WnirRegistries.MAGIC_CELLULOSE_TYPE.get()

@@ -18,6 +18,7 @@ bin/
 # NeoForge / Minecraft dev
 run/
 runs/
+/reports/
 src/main/generated/
 src/test/generated/
 # Gradle userdev extraction artifacts (root-level only — anchored with /)
@@ -25,8 +26,10 @@ src/test/generated/
 /META-INF/
 /assets/
 neoforge.mixins.json
+VanyLLa3d
 *.png
 !src/main/resources/**/*.png
+*.bak
 
 # OS
 .DS_Store

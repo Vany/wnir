@@ -96,9 +96,11 @@ Execute planned tasks in sequence; use insights from previous tasks to improve t
 - Challenge decisions you disagree with — argue your position
 - If no good solution exists, say so directly
 - For large well-known functionality, search for ready libraries before building from scratch
-- After two unsuccessful fix attempts, continue attempting fixes but assume further attempts may also fail, and significantly increase trace logging at key execution points to capture real runtime behavior and guide subsequent changes.
-- do not guess the api when documentation exists, read it.
-- use git to track changes. But commit only if QA passes.
+- After two failed fix attempts: keep trying, but stop reasoning from assumptions — instrument heavily (log every relevant value at every key point) and let runtime evidence drive the next change.
+- If docs or source exist, read them first before guessing API shape.
+- Workflow: implement → build → install → wait for Vany's QA → commit. No commit before QA confirms it works.
+- create release only if requested. Check readme and all documentation is updated before commit release.
+
 
 ### Module files
 Each module directory may contain:
