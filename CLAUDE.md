@@ -96,6 +96,9 @@ Execute planned tasks in sequence; use insights from previous tasks to improve t
 - Challenge decisions you disagree with — argue your position
 - If no good solution exists, say so directly
 - For large well-known functionality, search for ready libraries before building from scratch
+- After two unsuccessful fix attempts, continue attempting fixes but assume further attempts may also fail, and significantly increase trace logging at key execution points to capture real runtime behavior and guide subsequent changes.
+- do not guess the api when documentation exists, read it.
+- use git to track changes. But commit only if QA passes.
 
 ### Module files
 Each module directory may contain:

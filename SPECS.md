@@ -566,44 +566,68 @@ Passive FE buffer. Base capacity 1,000,000 FE. Retains charge when mined — dro
 
 ### Celluloser (`wnir:celluloser`)
 
-Converts enchanted books (or configured extra items) + water + FE into magic cellulose fluid.
+Converts enchanted books (or configured extra items) + water + FE into magic cellulose fluid. Also disassembles armor/weapons/tools into their crafting materials.
 
-**Inputs:**
-- Item slot (1 slot) — accepts enchanted books OR items listed in `CelluloserConfig`; consumed on start
-- Water (tank, 16 000 mB)
-- FE energy (buffer 1 000 000 FE)
+**Slots:**
+- Slot 0 — input: enchanted books, config-source items, or any armor/weapon/tool (EQUIPPABLE / WEAPON / TOOL component, or Bow/Crossbow/Trident)
+- Slots 1–9 — disassembly output (extract-only; filled after XP processing completes)
 
-**Output:** Magic Cellulose fluid (tank, 16 000 mB)
+**Fluid tanks:**
+- Water in (16 000 mB) — external insert, no extract
+- Magic Cellulose out (16 000 mB) — no insert, external extract
 
-**Processing parameters (public static, editable at runtime):**
+**Energy:** 1 000 000 FE buffer, external insert only.
 
-| Field | Default | Meaning |
-|-------|---------|---------|
+**Processing parameters (static finals in `CelluloserBlockEntity`):**
+
+| Constant | Value | Meaning |
+|----------|-------|---------|
 | `XP_PER_TICK` | 200 | XP processed per server tick |
-| `FE_PER_XP` | 100 | FE consumed per XP point |
-| `WATER_PER_XP` | 1 | mB water consumed per XP |
-| `OUTPUT_DIVISOR` | 10 | XP / divisor = mB cellulose produced |
-| `TANK_CAPACITY` | 16 000 | mB per tank |
-| `ENERGY_CAPACITY` | 1 000 000 | max FE buffer |
+| `FE_PER_MB` | 10 | FE consumed per mB cellulose produced |
+| `WATER_PER_MB` | 1 | mB water consumed per mB cellulose produced |
+| `OUTPUT_DIVISOR` | 10 | XP ÷ divisor = mB cellulose produced per tick |
+| `TANK_CAPACITY` | 16 000 | mB capacity for each fluid tank |
+| `ENERGY_CAPACITY` | 1 000 000 | max FE in buffer |
+| `DISASSEMBLY_XP` | 80 × XP_PER_TICK | base extra XP added per disassembly (scaled by health) |
+| `DISASSEMBLY_FE` | 128 | base upfront FE charged per disassembly (scaled by health) |
 
-**Behaviour:**
-- Pauses (preserves progress) when energy, water, or output space is exhausted
-- Processing resumes automatically when resources are available
-- XP for enchanted books: sum of `levelToXp((minCost + maxCost) / 2)` per enchantment
-- XP for config items: fixed value from `wnir_celluloser.toml`
+Per-tick at full load: 200 XP processed → 20 mB cellulose out → 20 mB water consumed → 200 FE consumed.
+
+**Behaviour — enchanted-book / config-source path:**
+1. Item consumed from slot 0; XP total calculated.
+2. Each tick: consume min(remainingXp, XP_PER_TICK), convert to cellulose, consume water + FE proportionally.
+3. Machine pauses (preserves progress) when energy, water, or cellulose-tank space is exhausted.
+
+**Behaviour — disassembly path (armor / weapon / tool):**
+1. `survivalProb = 1 − damage / maxDamage` (1.0 for undamaged or non-damageable items).
+2. Random roll: if `nextFloat() < survivalProb`, recipe lookup finds crafting materials.
+3. Upfront FE charged immediately: `max(1, floor(DISASSEMBLY_FE × survivalProb))`.
+4. Extra processing time added: `max(1, floor(DISASSEMBLY_XP × survivalProb))` XP, consumed over ticks with energy + water like the enchanted-book path.
+5. Crafting materials stored as `pendingMaterials`; deposited into output slots 1–9 only after all XP is processed. Machine stalls if output slots remain full.
+6. Items with enchantments also contribute XP; total = enchantment XP + scaled disassembly XP.
+7. Machine stalls if no XP and no materials would be produced (e.g. unenchanted item with no known recipe).
+
+**Disassembly recipe lookup (`resolveRecipe`):**
+- Checks smithing recipes first: finds the base item recursively, keeps the addition ingredient (e.g. netherite ingot). Template excluded.
+- Falls back to crafting recipes: skips recipes whose ingredients contain EQUIPPABLE items (repair/upgrade recipes). Merges ingredient counts by item type.
+- Modded recipes that throw or return null on `assemble(CraftingInput.EMPTY)` are silently skipped.
+- Results cached per item type in `disassemblyCache`.
+
+**XP calculation (enchantments):**
+- `calcItemXp`: sum of `levelToXp((minCost + maxCost) / 2)` per enchantment (stored or regular).
 
 **Extra item sources (`config/wnir_celluloser.toml`):**
-- Loaded once on server start via `CelluloserConfig.load()`
-- Format: `item_registry_id = xp_value` under `[sources]`
-- File created with defaults on first run: `minecraft:player_head = 10000`, `evilcraft:origins_of_darkness = 200`, `ars_nouveau:caster_tome = 400`, `waystones:attuned_shard = 100`
-- Items in this map bypass the enchantment check in `canPlaceItem` — hoppers can push them in
+- Loaded on server start via `CelluloserConfig.load()`.
+- Format: `item_registry_id = xp_value` under `[sources]`.
+- Defaults: `minecraft:player_head = 10000`, `evilcraft:origins_of_darkness = 200`, `ars_nouveau:caster_tome = 400`, `waystones:attuned_shard = 100`.
+- Items in this map bypass the enchantment check — hoppers can push them in.
 
 **NeoForge capabilities (registered in `WnirMod`):**
-- `Capabilities.Item.BLOCK` → `VanillaContainerWrapper.of(be)` (all faces — enables vanilla hopper input)
-- `Capabilities.Energy.BLOCK` → `be.energyHandler` (insert only, all faces)
-- `Capabilities.Fluid.BLOCK` → `be.fluidHandler` (insert water slot 0; extract cellulose slot 1)
+- `Capabilities.Item.BLOCK` → `VanillaContainerWrapper.of(be)` (all faces)
+- `Capabilities.Energy.BLOCK` → `be.energyHandler` (insert only)
+- `Capabilities.Fluid.BLOCK` → `be.fluidHandler` (insert water tank 0; extract cellulose tank 1)
 
-**GUI:** energy bar (fills from bottom) + water tank + cellulose tank + progress arrow. Texture `textures/gui/container/celluloser.png` (256×256). Fill sprites packed at y=168.
+**GUI:** 176×190 px. Energy bar + water tank + cellulose tank (all fill from bottom, left-to-right). Progress arrow fills left-to-right. Nine output slots in a row below the tanks. Player inventory below that. Texture `textures/gui/container/celluloser.png` (256×256, 8-bit RGBA). Fill sprites at y=192 (outside the 190 px GUI area to avoid overlap).
 
 **Recipe:** shaped — `"EBE" / "SLS" / "GEG"` (E=emerald, B=brush, S=shears, L=lectern, G=gold_ingot).
 

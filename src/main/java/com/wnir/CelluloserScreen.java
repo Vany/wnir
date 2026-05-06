@@ -19,7 +19,7 @@ import java.util.Optional;
  *   [101,37] Progress arrow  22×15
  *   [127,14] Cellulose tank  20×56 frame, 18×54 fill
  *
- * Fill textures are packed at y=168 in the 256×256 PNG:
+ * Fill textures are packed at y=192 in the 256×256 PNG (above 190px GUI area to avoid overlap):
  *   x=0   w=14 h=54  energy fill  (orange)
  *   x=14  w=18 h=54  water fill   (blue)
  *   x=32  w=18 h=54  cellulose fill (pink)
@@ -31,7 +31,7 @@ public class CelluloserScreen extends AbstractContainerScreen<CelluloserMenu> {
         Identifier.fromNamespaceAndPath(WnirMod.MOD_ID, "textures/gui/container/celluloser.png");
 
     // Fill texture origins in the PNG
-    private static final int FILL_Y     = 168;
+    private static final int FILL_Y     = 192;
     private static final int E_FILL_X   = 0,  E_FILL_W  = 14, FILL_H = 54;
     private static final int W_FILL_X   = 14, W_FILL_W  = 18;
     private static final int C_FILL_X   = 32, C_FILL_W  = 18;

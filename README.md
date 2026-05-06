@@ -1,15 +1,15 @@
-[![NeoForge](https://img.shields.io/badge/NeoForge-21.11.38--beta-orange.svg)](https://neoforged.net/)
-[![Minecraft](https://img.shields.io/badge/Minecraft-1.21.11-green.svg)](https://minecraft.net/)
+[![NeoForge](https://img.shields.io/badge/NeoForge-26.1.2--beta-orange.svg)](https://neoforged.net/)
+[![Minecraft](https://img.shields.io/badge/Minecraft-26.1.2-green.svg)](https://minecraft.net/)
 [![Java](https://img.shields.io/badge/Java-21+-blue.svg)](https://openjdk.org/)
 [![License](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
 # WNIR — When Nothing Is Ready
 
-A standalone NeoForge mod for Minecraft 1.21.11 that fills gaps in vanilla gameplay with custom blocks, mob effects, enchantments, potions, and utility items.
+A standalone NeoForge mod for Minecraft 26 that fills gaps in vanilla gameplay with custom blocks, mob effects, enchantments, potions, and utility items.
 
 All items and blocks show a one-sentence description in their tooltip. Hold **SHIFT** while hovering to expand into a full usage description.
 
-**Mod ID:** `wnir` | **Loader:** NeoForge 21.11.38-beta | **Java:** 21+
+**Mod ID:** `wnir` | **Loader:** NeoForge 26.1.2-beta | **Java:** 21+
 
 ---
 
@@ -292,18 +292,35 @@ An automated turret that fires arrows at nearby hostile mobs. Load it with bows,
 
 ### Celluloser
 
-Processes enchanted books (or configured mod items), water, and Forge Energy into **Magic Cellulose** fluid.
+Converts enchanted books, armor, weapons, and tools + water + FE into **Magic Cellulose** fluid, and disassembles equipment back into its crafting materials.
 
 | | |
 |---|---|
-| **Inputs** | Enchanted book or configured item + water + FE |
-| **Output** | Magic Cellulose fluid |
+| **Input slot** | Enchanted book, configured item, or any armor / weapon / tool |
+| **Output slots** | 9 slots — disassembly materials, filled after processing finishes |
+| **Fluid in** | Water (16 000 mB tank) |
+| **Fluid out** | Magic Cellulose (16 000 mB tank) |
+| **Energy** | FE, insert-only (1 000 000 FE buffer) |
 | **Recipe** | Shaped: emerald / brush / shears / lectern / gold ingot |
 | **Tool** | Pickaxe |
 
-Right-click to open the GUI showing energy bar, water tank, cellulose tank, and progress arrow. Contents are preserved when the block is mined.
+Right-click to open the GUI: energy bar, water tank, cellulose tank, progress arrow, and nine output slots. Contents are preserved when the block is mined.
 
-**Extra item sources:** edit `config/wnir_celluloser.toml` to add non-enchanted items with fixed XP values. The file is created with defaults on first server start:
+**Enchanted book / configured item path:**
+- XP from the book is processed tick by tick, consuming water and FE proportionally.
+- Rate: 200 XP/tick → 20 mB cellulose, 20 mB water, 200 FE per tick.
+- Machine pauses and preserves progress when resources run out.
+
+**Disassembly path (armor, weapons, tools):**
+- Looks up the item's crafting recipe (smithing → crafting fallback) and extracts the ingredient list as materials.
+- **Damage scaling** — both processing time and upfront energy scale with remaining health (pristine = full cost; heavily damaged = cheaper and faster):
+  - *Pristine item:* 80 ticks + 128 FE upfront
+  - *50 % damaged:* 40 ticks + 64 FE
+- Whether materials drop at all is also chance-based: a fully damaged item has 0 % chance of returning any materials.
+- Materials appear in the nine output slots only **after** all XP processing finishes.
+- Machine stalls if output slots are full.
+
+**Extra item sources:** edit `config/wnir_celluloser.toml` to add non-enchanted items with fixed XP values (created with defaults on first server start):
 
 ```toml
 [sources]
@@ -312,7 +329,7 @@ ars_nouveau:caster_tome = 400
 waystones:attuned_shard = 100
 ```
 
-Vanilla hoppers can push items into the Celluloser directly.
+Vanilla hoppers can push items into the input slot directly.
 
 ---
 
@@ -548,9 +565,9 @@ make jar        # Build and print jar path
 make setup      # Initialize Gradle wrapper (8.14)
 ```
 
-Output: `build/libs/wnir-1.21.11-1.0.0.jar`
+Output: `build/libs/wnir-26.1.2-1.0.0.jar`
 
-**Requirements:** Java 21, NeoForge 21.11.38-beta, Minecraft 1.21.11.
+**Requirements:** Java 21, NeoForge 26.1.2-beta, Minecraft 26.1.2.
 
 ---
 

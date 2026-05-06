@@ -39,8 +39,6 @@ import net.neoforged.neoforge.fluids.FluidStack;
 import net.neoforged.neoforge.transfer.energy.SimpleEnergyHandler;
 import net.neoforged.neoforge.transfer.fluid.FluidResource;
 import net.neoforged.neoforge.transfer.fluid.FluidStacksResourceHandler;
-import net.neoforged.neoforge.transfer.transaction.Transaction;
-
 import net.minecraft.core.Holder;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -90,13 +88,18 @@ public class CelluloserBlockEntity extends BlockEntity implements Container, net
 
     // ── State ────────────────────────────────────────────────────────────────
 
-    static final int OUTPUT_SLOTS = 9; // slots 1..OUTPUT_SLOTS are disassembly output
-    static final int TOTAL_SLOTS  = 1 + OUTPUT_SLOTS;
+    static final int OUTPUT_SLOTS   = 9; // slots 1..OUTPUT_SLOTS are disassembly output
+    static final int TOTAL_SLOTS    = 1 + OUTPUT_SLOTS;
+    static final int DISASSEMBLY_XP = 80 * XP_PER_TICK; // extra processing time added per disassembly
+    static final int DISASSEMBLY_FE = 128;              // flat FE cost charged upfront per disassembly
 
     // Slot 0 = input; slots 1–9 = disassembly output
     private NonNullList<ItemStack> items = NonNullList.withSize(TOTAL_SLOTS, ItemStack.EMPTY);
     private int remainingXp = 0;
     private int totalXp     = 0;
+
+    // Materials queued from disassembly — deposited into output slots once processing completes.
+    private List<ItemStack> pendingMaterials = List.of();
 
     // Recipe → material list cache. Populated lazily on first use.
     private final Map<Item, List<ItemStack>> disassemblyCache = new HashMap<>();
@@ -174,6 +177,9 @@ public class CelluloserBlockEntity extends BlockEntity implements Container, net
         fluidHandler.deserialize(input.childOrEmpty("Fluids"));
         remainingXp = input.getIntOr("RemainingXp", 0);
         totalXp     = input.getIntOr("TotalXp",     0);
+        NonNullList<ItemStack> pendingList = NonNullList.withSize(OUTPUT_SLOTS, ItemStack.EMPTY);
+        ContainerHelper.loadAllItems(input.childOrEmpty("Pending"), pendingList);
+        pendingMaterials = pendingList.stream().filter(s -> !s.isEmpty()).toList();
     }
 
     @Override
@@ -184,6 +190,13 @@ public class CelluloserBlockEntity extends BlockEntity implements Container, net
         fluidHandler.serialize(output.child("Fluids"));
         output.putInt("RemainingXp", remainingXp);
         output.putInt("TotalXp",     totalXp);
+        if (!pendingMaterials.isEmpty()) {
+            NonNullList<ItemStack> pendingList = NonNullList.withSize(OUTPUT_SLOTS, ItemStack.EMPTY);
+            for (int i = 0; i < Math.min(pendingMaterials.size(), OUTPUT_SLOTS); i++) {
+                pendingList.set(i, pendingMaterials.get(i));
+            }
+            ContainerHelper.saveAllItems(output.child("Pending"), pendingList, false);
+        }
     }
 
     // ── Container ────────────────────────────────────────────────────────────
@@ -266,8 +279,18 @@ public class CelluloserBlockEntity extends BlockEntity implements Container, net
     public static void serverTick(Level level, BlockPos pos, BlockState state, CelluloserBlockEntity be) {
         boolean changed = false;
 
-        // Consume item from slot 0 when idle
-        if (be.remainingXp == 0) {
+        // Deposit pending materials once XP processing completes
+        if (be.remainingXp == 0 && !be.pendingMaterials.isEmpty()) {
+            if (be.canFitMaterials(be.pendingMaterials)) {
+                be.fitMaterials(be.pendingMaterials, true);
+                be.pendingMaterials = List.of();
+                changed = true;
+            }
+            // output full — stall until space opens
+        }
+
+        // Consume item from slot 0 when fully idle (no XP left, no pending materials)
+        if (be.remainingXp == 0 && be.pendingMaterials.isEmpty()) {
             ItemStack input = be.items.get(0);
             if (!input.isEmpty()) {
                 int xp = 0;
@@ -281,29 +304,39 @@ public class CelluloserBlockEntity extends BlockEntity implements Container, net
                 }
 
                 boolean disassemble = isDisassemblableItem(input);
+                // Remaining-health fraction: 1.0 = pristine, 0.0 = fully broken.
+                // Scales both processing time and upfront FE for disassembly.
+                float survivalProb = (disassemble && input.getMaxDamage() > 0)
+                    ? 1.0f - (float) input.getDamageValue() / input.getMaxDamage()
+                    : 1.0f;
 
                 if (xp > 0 || disassemble) {
                     List<ItemStack> mats = List.of();
-                    if (disassemble) {
-                        float survivalProb = input.getMaxDamage() > 0
-                            ? 1.0f - (float) input.getDamageValue() / input.getMaxDamage()
-                            : 1.0f;
-                        if (level.getRandom().nextFloat() < survivalProb) {
-                            mats = be.getDisassemblyMaterials(input.getItem(), level);
-                        }
+                    if (disassemble && level.getRandom().nextFloat() < survivalProb) {
+                        mats = be.getDisassemblyMaterials(input.getItem(), level);
                     }
 
-                    if (xp == 0 && mats.isEmpty()) {
-                        // Nothing to produce — leave item alone
-                    } else if (!mats.isEmpty() && !be.canFitMaterials(mats)) {
-                        // Output slots full — pause until space opens
-                    } else {
-                        input.shrink(1);
-                        if (xp > 0) {
-                            be.remainingXp = xp;
-                            be.totalXp     = xp;
+                    int scaledXp = Math.max(1, (int)(DISASSEMBLY_XP * survivalProb));
+                    int scaledFe = Math.max(1, (int)(DISASSEMBLY_FE * survivalProb));
+
+                    boolean needsDisassemblyFe = !mats.isEmpty();
+                    boolean hasDisassemblyFe   = !needsDisassemblyFe
+                        || be.energyHandler.getAmountAsInt() >= scaledFe;
+
+                    boolean canProcess = (xp > 0 || !mats.isEmpty())
+                        && (mats.isEmpty() || be.canFitMaterials(mats))
+                        && hasDisassemblyFe;
+                    if (canProcess) {
+                        if (needsDisassemblyFe) {
+                            be.energyHandler.set(be.energyHandler.getAmountAsInt() - scaledFe);
                         }
-                        if (!mats.isEmpty()) be.placeMaterials(mats);
+                        input.shrink(1);
+                        int totalXp = xp + (!mats.isEmpty() ? scaledXp : 0);
+                        if (totalXp > 0) {
+                            be.remainingXp = totalXp;
+                            be.totalXp     = totalXp;
+                        }
+                        if (!mats.isEmpty()) be.pendingMaterials = List.copyOf(mats);
                         changed = true;
                     }
                 }
@@ -326,12 +359,11 @@ public class CelluloserBlockEntity extends BlockEntity implements Container, net
                 var waterRes = FluidResource.of(Fluids.WATER);
                 var cellRes  = FluidResource.of(WnirRegistries.MAGIC_CELLULOSE_STILL.get());
 
-                try (var tx = Transaction.openRoot()) {
-                    be.energyHandler.extract(feNeeded, tx);
-                    be.fluidHandler.extract(0, waterRes, wNeeded, tx);
-                    be.fluidHandler.set(1, cellRes, (int)(be.fluidHandler.getAmountAsLong(1) + cellOut));
-                    tx.commit();
-                }
+                // Use set() for all internal modifications — extract() is rate-limited
+                // (maxExtract=0 for energy; slot-0 extract overridden to 0 for fluid)
+                be.energyHandler.set(be.energyHandler.getAmountAsInt() - feNeeded);
+                be.fluidHandler.set(0, waterRes, (int)(be.fluidHandler.getAmountAsLong(0)) - wNeeded);
+                be.fluidHandler.set(1, cellRes,  (int)(be.fluidHandler.getAmountAsLong(1)) + cellOut);
                 be.remainingXp -= tickXp;
                 changed = true;
             }
@@ -414,7 +446,7 @@ public class CelluloserBlockEntity extends BlockEntity implements Container, net
             } catch (Exception e) {
                 continue;
             }
-            if (result.isEmpty() || result.getItem() != target) continue;
+            if (result == null || result.isEmpty() || result.getItem() != target) continue;
 
             // Skip repair/upgrade recipes that contain equipped-slot items as ingredients
             List<Ingredient> ings = recipe.placementInfo().ingredients();
