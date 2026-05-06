@@ -20,11 +20,10 @@ run/
 runs/
 src/main/generated/
 src/test/generated/
-# Gradle userdev extraction artifacts
-net/
-META-INF/
-assets/
-reports/
+# Gradle userdev extraction artifacts (root-level only — anchored with /)
+/net/
+/META-INF/
+/assets/
 neoforge.mixins.json
 *.png
 !src/main/resources/**/*.png
@@ -32,6 +31,3 @@ neoforge.mixins.json
 # OS
 .DS_Store
 Thumbs.db
-
-# Gradle wrapper (keep gradlew scripts, ignore jar)
-!gradle/wrapper/gradle-wrapper.jar
