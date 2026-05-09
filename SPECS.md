@@ -209,9 +209,11 @@ Created automatically when a `BuddingAmethystBlock` is placed on top of an EE Cl
 
 **Growth:** `BASE_TICKS = 168000` (1 Minecraft week). Scales by column height below: N EE Clocks → 168 000 / N ticks. Does NOT accelerate via EE Clock's extra-tick mechanism (guarded in `EEClockBlockEntity`).
 
+**Fuel:** consumes 16 ender pearls total, evenly over the growth period — 1 pearl per `BASE_TICKS / 16` progress ticks. Pauses if slot is empty when the next pearl is due.
+
 **Transformation:** when progress reaches `BASE_TICKS`, the block replaces itself with an `EEClockBlock`.
 
-**GUI:** right-click opens `GrowingCrystalScreen` (factory: `"ee_clock_budding_crystal"`, color `0xFF55AA44`) to show growth progress.
+**GUI:** right-click opens `GrowingCrystalScreen` (factory: `"ee_clock_budding_crystal"`, color `0xFF55AA44`) to insert ender pearls and monitor progress.
 
 **Acquisition:** crafted or obtained via EE Clock + budding amethyst interaction.
 
@@ -223,11 +225,27 @@ Created automatically when crying obsidian is placed on top of an EE Clock colum
 
 **Growth:** same `BASE_TICKS = 168000` schedule as EE Clock Budding Crystal, scaled by column height.
 
-**Fuel:** consumes 16 ender pearls total — 14 fed in via GUI during growth, 2 consumed at transformation.
+**Fuel:** consumes 16 ender pearls total, evenly over the growth period — 1 pearl per `BASE_TICKS / 16` progress ticks. Pauses if slot is empty when the next pearl is due.
 
 **Transformation:** when fully grown and fuelled, replaces itself with a `PersonalDimensionTeleporterBlock`.
 
-**GUI:** right-click opens `GrowingCrystalScreen` (factory: `"teleporter_crystal"`, color `0xFF9955CC`) to insert ender pearls and monitor progress.
+**GUI:** right-click opens `GrowingCrystalScreen` (factory: `"teleporter_crystal"`, color `0xFF9955CC`) to insert ender pearls and monitor progress. Pearls are consumed evenly — insert them any time before they are needed.
+
+---
+
+### Warding Zigota (`wnir:warding_zigota`)
+
+Created automatically when an `EndRodBlock` is placed on top of an EE Clock column, or when an EE Clock is placed below an existing end rod.
+
+**Growth:** `BASE_TICKS = 24_000` (1 Minecraft day). Scales by column height: N EE Clocks → `24 000 / N` ticks.
+
+**Fuel:** consumes 64 torches total, evenly over the growth period — 1 torch per `BASE_TICKS / 64` progress ticks. Pauses if slot is empty when the next torch is due.
+
+**Transformation:** when growth completes, the block replaces itself with a `WardingPostBlock`.
+
+**GUI:** right-click opens `GrowingCrystalScreen` (factory: `"warding_zigota"`, color `0xFFCC8800`). Single torch slot at the standard fuel position.
+
+**Acquisition:** place end rod above an EE Clock column.
 
 ---
 

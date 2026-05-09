@@ -1,15 +1,22 @@
 package com.wnir;
 
+import java.util.List;
 import com.mojang.serialization.MapCodec;
 import net.minecraft.core.component.DataComponents;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.world.item.BlockItem;
 import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.ItemStackTemplate;
+import net.minecraft.world.item.Items;
 import net.minecraft.world.item.component.TypedEntityData;
 import net.minecraft.world.item.crafting.CraftingInput;
 import net.minecraft.world.item.crafting.CustomRecipe;
+import net.minecraft.world.item.crafting.Ingredient;
 import net.minecraft.world.item.crafting.RecipeSerializer;
+import net.minecraft.world.item.crafting.display.RecipeDisplay;
+import net.minecraft.world.item.crafting.display.ShapelessCraftingRecipeDisplay;
+import net.minecraft.world.item.crafting.display.SlotDisplay;
 import net.minecraft.world.level.Level;
 
 /**
@@ -49,6 +56,16 @@ public class OpaqueTankCombineRecipe extends CustomRecipe {
             }
         }
         return count >= 2;
+    }
+
+    @Override
+    public List<RecipeDisplay> display() {
+        SlotDisplay tank = Ingredient.of(WnirRegistries.OPAQUE_TANK_BLOCK.get().asItem()).display();
+        return List.of(new ShapelessCraftingRecipeDisplay(
+            List.of(tank, tank),
+            new SlotDisplay.ItemStackSlotDisplay(new ItemStackTemplate(WnirRegistries.OPAQUE_TANK_BLOCK.get().asItem())),
+            new SlotDisplay.ItemSlotDisplay(Items.CRAFTING_TABLE.builtInRegistryHolder())
+        ));
     }
 
     @Override

@@ -327,8 +327,16 @@ public final class WnirRegistries {
         registerBlock("ee_clock", EEClockBlock::new, EEClockBlockEntity::new,
             BlockBehaviour.Properties.of().mapColor(MapColor.COLOR_CYAN).sound(SoundType.METAL).randomTicks());
 
-    private static final BlockBundle<EEClockBuddingCrystalBlock, EEClockBuddingCrystalBlockEntity> EE_CLOCK_BUDDING_CRYSTAL =
-        registerBlock("ee_clock_budding_crystal", EEClockBuddingCrystalBlock::new, EEClockBuddingCrystalBlockEntity::new,
+    private static final BlockBundle<ZygoteBlock, ZygoteBlockEntity> WARDING_ZYGOTE =
+        registerBlock("warding_zygote", props -> new ZygoteBlock(ZygoteVariant.WARDING, props), ZygoteBlockEntity::new,
+            BlockBehaviour.Properties.of()
+                .mapColor(MapColor.COLOR_LIGHT_GRAY)
+                .sound(SoundType.AMETHYST)
+                .strength(1.5f)
+                .requiresCorrectToolForDrops());
+
+    private static final BlockBundle<ZygoteBlock, ZygoteBlockEntity> EE_CLOCK_ZYGOTE =
+        registerBlock("ee_clock_zygote", props -> new ZygoteBlock(ZygoteVariant.EE_CLOCK, props), ZygoteBlockEntity::new,
             BlockBehaviour.Properties.of()
                 .mapColor(MapColor.COLOR_LIGHT_GREEN)
                 .sound(SoundType.AMETHYST)
@@ -360,8 +368,8 @@ public final class WnirRegistries {
                 .requiresCorrectToolForDrops()
                 .strength(50f, 1_200_000f));
 
-    private static final BlockBundle<TeleporterCrystalBlock, TeleporterCrystalBlockEntity> TELEPORTER_CRYSTAL =
-        registerBlock("teleporter_crystal", TeleporterCrystalBlock::new, TeleporterCrystalBlockEntity::new,
+    private static final BlockBundle<ZygoteBlock, ZygoteBlockEntity> TELEPORTER_ZYGOTE =
+        registerBlock("teleporter_zygote", props -> new ZygoteBlock(ZygoteVariant.TELEPORTER, props), ZygoteBlockEntity::new,
             BlockBehaviour.Properties.of()
                 .mapColor(MapColor.COLOR_PURPLE)
                 .sound(SoundType.AMETHYST)
@@ -518,11 +526,14 @@ public final class WnirRegistries {
     public static final Supplier<MenuType<WnirHopperMenu>> NETHER_HOPPER_MENU =
         MENU_TYPES.register("nether_hopper", () -> new MenuType<>(WnirHopperMenu::nether, FeatureFlags.VANILLA_SET));
 
-    public static final Supplier<MenuType<GrowingCrystalMenu>> EE_CLOCK_BUDDING_CRYSTAL_MENU =
-        MENU_TYPES.register("ee_clock_budding_crystal", () -> new MenuType<>(GrowingCrystalMenu::eeClock, FeatureFlags.VANILLA_SET));
+    public static final Supplier<MenuType<ZygoteMenu>> EE_CLOCK_ZYGOTE_MENU =
+        MENU_TYPES.register("ee_clock_zygote",   () -> new MenuType<>(ZygoteMenu::eeClockZygote,   FeatureFlags.VANILLA_SET));
 
-    public static final Supplier<MenuType<GrowingCrystalMenu>> TELEPORTER_CRYSTAL_MENU =
-        MENU_TYPES.register("teleporter_crystal", () -> new MenuType<>(GrowingCrystalMenu::teleporter, FeatureFlags.VANILLA_SET));
+    public static final Supplier<MenuType<ZygoteMenu>> TELEPORTER_ZYGOTE_MENU =
+        MENU_TYPES.register("teleporter_zygote", () -> new MenuType<>(ZygoteMenu::teleporterZygote, FeatureFlags.VANILLA_SET));
+
+    public static final Supplier<MenuType<ZygoteMenu>> WARDING_ZYGOTE_MENU =
+        MENU_TYPES.register("warding_zygote",    () -> new MenuType<>(ZygoteMenu::wardingZygote,    FeatureFlags.VANILLA_SET));
 
     public static final Supplier<MenuType<SkullBeehiveMenu>> SKULL_BEEHIVE_MENU =
         MENU_TYPES.register("skull_beehive", () -> new MenuType<>(SkullBeehiveMenu::new, FeatureFlags.VANILLA_SET));
@@ -549,10 +560,45 @@ public final class WnirRegistries {
     public static final Supplier<BlockEntityType<WardingColumnBlockEntity>> WARDING_COLUMN_BLOCK_ENTITY = WARDING_COLUMN_BE;
     public static final Supplier<BlockEntityType<EEClockBlockEntity>> EE_CLOCK_BE = EE_CLOCK.entity;
     public static final Supplier<EEClockBlock> EE_CLOCK_BLOCK = EE_CLOCK.block;
-    public static final Supplier<BlockEntityType<EEClockBuddingCrystalBlockEntity>> EE_CLOCK_BUDDING_CRYSTAL_BE = EE_CLOCK_BUDDING_CRYSTAL.entity;
-    public static final Supplier<EEClockBuddingCrystalBlock> EE_CLOCK_BUDDING_CRYSTAL_BLOCK = EE_CLOCK_BUDDING_CRYSTAL.block;
-    public static final Supplier<BlockEntityType<TeleporterCrystalBlockEntity>> TELEPORTER_CRYSTAL_BE = TELEPORTER_CRYSTAL.entity;
-    public static final Supplier<TeleporterCrystalBlock> TELEPORTER_CRYSTAL_BLOCK = TELEPORTER_CRYSTAL.block;
+    public static final Supplier<WardingPostBlock> WARDING_POST_BLOCK = WARDING_POST.block;
+    public static final Supplier<ZygoteBlock>                   WARDING_ZYGOTE_BLOCK    = WARDING_ZYGOTE.block;
+    public static final Supplier<BlockEntityType<ZygoteBlockEntity>> WARDING_ZYGOTE_BE  = WARDING_ZYGOTE.entity;
+    public static final Supplier<BlockItem>                     WARDING_ZYGOTE_ITEM     = WARDING_ZYGOTE.item;
+
+    public static final Supplier<ZygoteBlock>                   EE_CLOCK_ZYGOTE_BLOCK   = EE_CLOCK_ZYGOTE.block;
+    public static final Supplier<BlockEntityType<ZygoteBlockEntity>> EE_CLOCK_ZYGOTE_BE  = EE_CLOCK_ZYGOTE.entity;
+    public static final Supplier<BlockItem>                     EE_CLOCK_ZYGOTE_ITEM    = EE_CLOCK_ZYGOTE.item;
+
+    public static final Supplier<ZygoteBlock>                   TELEPORTER_ZYGOTE_BLOCK = TELEPORTER_ZYGOTE.block;
+    public static final Supplier<BlockEntityType<ZygoteBlockEntity>> TELEPORTER_ZYGOTE_BE = TELEPORTER_ZYGOTE.entity;
+    public static final Supplier<BlockItem>                     TELEPORTER_ZYGOTE_ITEM  = TELEPORTER_ZYGOTE.item;
+
+    /** Look up a ZygoteBlockEntity type by variant. */
+    public static BlockEntityType<ZygoteBlockEntity> zygoteBeType(ZygoteVariant v) {
+        return switch (v) {
+            case EE_CLOCK   -> EE_CLOCK_ZYGOTE_BE.get();
+            case TELEPORTER -> TELEPORTER_ZYGOTE_BE.get();
+            case WARDING    -> WARDING_ZYGOTE_BE.get();
+        };
+    }
+
+    /** Look up a ZygoteBlock instance by variant. */
+    public static ZygoteBlock zygoteBlock(ZygoteVariant v) {
+        return switch (v) {
+            case EE_CLOCK   -> EE_CLOCK_ZYGOTE_BLOCK.get();
+            case TELEPORTER -> TELEPORTER_ZYGOTE_BLOCK.get();
+            case WARDING    -> WARDING_ZYGOTE_BLOCK.get();
+        };
+    }
+
+    /** Look up a ZygoteMenu type by variant. */
+    public static MenuType<ZygoteMenu> zygoteMenuType(ZygoteVariant v) {
+        return switch (v) {
+            case EE_CLOCK   -> EE_CLOCK_ZYGOTE_MENU.get();
+            case TELEPORTER -> TELEPORTER_ZYGOTE_MENU.get();
+            case WARDING    -> WARDING_ZYGOTE_MENU.get();
+        };
+    }
     public static final Supplier<PersonalDimensionTeleporterBlock> PERSONAL_DIMENSION_TELEPORTER_BLOCK = PERSONAL_DIMENSION_TELEPORTER.block;
 
     public static final Supplier<BlockEntityType<SkullBeehiveBlockEntity>> SKULL_BEEHIVE_BE = SKULL_BEEHIVE.entity;
@@ -587,9 +633,7 @@ public final class WnirRegistries {
     public static final Supplier<BlockItem> RESHAPER_POST_ITEM = RESHAPER_POST.item;
     public static final Supplier<BlockItem> ANTI_WITHER_ITEM = ANTI_WITHER.item;
     public static final Supplier<BlockItem> EE_CLOCK_ITEM = EE_CLOCK.item;
-    public static final Supplier<BlockItem> EE_CLOCK_BUDDING_CRYSTAL_ITEM = EE_CLOCK_BUDDING_CRYSTAL.item;
     public static final Supplier<BlockItem> PERSONAL_DIMENSION_TELEPORTER_ITEM = PERSONAL_DIMENSION_TELEPORTER.item;
-    public static final Supplier<BlockItem> TELEPORTER_CRYSTAL_ITEM = TELEPORTER_CRYSTAL.item;
 
     // ── Creative tab ─────────────────────────────────────────────────────
 
@@ -611,8 +655,9 @@ public final class WnirRegistries {
                     output.accept(RESHAPER_POST_ITEM.get());
                     output.accept(ANTI_WITHER_ITEM.get());
                     output.accept(EE_CLOCK_ITEM.get());
-                    output.accept(EE_CLOCK_BUDDING_CRYSTAL_ITEM.get());
-                    output.accept(TELEPORTER_CRYSTAL_ITEM.get());
+                    output.accept(EE_CLOCK_ZYGOTE_ITEM.get());
+                    output.accept(TELEPORTER_ZYGOTE_ITEM.get());
+                    output.accept(WARDING_ZYGOTE_ITEM.get());
                     output.accept(MOSSY_HOPPER_ITEM.get());
                     output.accept(STEEL_HOPPER_ITEM.get());
                     output.accept(NETHER_HOPPER_ITEM.get());

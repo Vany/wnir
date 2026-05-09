@@ -1,11 +1,17 @@
 package com.wnir;
 
+import java.util.List;
 import com.mojang.serialization.MapCodec;
 import net.minecraft.core.HolderLookup;
 import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.network.RegistryFriendlyByteBuf;
 import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.ItemStackTemplate;
+import net.minecraft.world.item.Items;
 import net.minecraft.world.item.crafting.*;
+import net.minecraft.world.item.crafting.display.RecipeDisplay;
+import net.minecraft.world.item.crafting.display.ShapelessCraftingRecipeDisplay;
+import net.minecraft.world.item.crafting.display.SlotDisplay;
 import net.minecraft.world.level.Level;
 
 /**
@@ -42,6 +48,18 @@ public class NbtWiperRecipe extends CustomRecipe {
             else hasTarget = true;
         }
         return nonEmpty == 2 && hasWiper && hasTarget;
+    }
+
+    /** Shows wiper + iron ingot → iron ingot as a representative example (works on any item). */
+    @Override
+    public List<RecipeDisplay> display() {
+        SlotDisplay wiper  = Ingredient.of(WnirRegistries.NBT_WIPER_LIQUID_ITEM.get()).display();
+        SlotDisplay sample = Ingredient.of(Items.IRON_INGOT).display();
+        return List.of(new ShapelessCraftingRecipeDisplay(
+            List.of(wiper, sample),
+            new SlotDisplay.ItemStackSlotDisplay(new ItemStackTemplate(Items.IRON_INGOT)),
+            new SlotDisplay.ItemSlotDisplay(Items.CRAFTING_TABLE.builtInRegistryHolder())
+        ));
     }
 
     @Override

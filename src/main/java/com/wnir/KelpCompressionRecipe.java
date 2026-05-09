@@ -1,14 +1,20 @@
 package com.wnir;
 
+import java.util.List;
 import net.minecraft.core.NonNullList;
 import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.ItemStackTemplate;
 import net.minecraft.world.item.Items;
 import com.mojang.serialization.MapCodec;
 import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.network.RegistryFriendlyByteBuf;
 import net.minecraft.world.item.crafting.CraftingInput;
 import net.minecraft.world.item.crafting.CustomRecipe;
+import net.minecraft.world.item.crafting.Ingredient;
 import net.minecraft.world.item.crafting.RecipeSerializer;
+import net.minecraft.world.item.crafting.display.RecipeDisplay;
+import net.minecraft.world.item.crafting.display.ShapedCraftingRecipeDisplay;
+import net.minecraft.world.item.crafting.display.SlotDisplay;
 import net.minecraft.world.level.Level;
 
 /**
@@ -65,6 +71,18 @@ public class KelpCompressionRecipe extends CustomRecipe {
      * Returns a dried kelp block in the center slot (index 4) as a crafting residue.
      * All other slots return empty (default).
      */
+    @Override
+    public List<RecipeDisplay> display() {
+        SlotDisplay kelp  = Ingredient.of(Items.KELP).display();
+        SlotDisplay magma = Ingredient.of(Items.MAGMA_CREAM).display();
+        return List.of(new ShapedCraftingRecipeDisplay(
+            3, 3,
+            List.of(kelp, kelp, kelp, kelp, magma, kelp, kelp, kelp, kelp),
+            new SlotDisplay.ItemStackSlotDisplay(new ItemStackTemplate(Items.SLIME_BALL)),
+            new SlotDisplay.ItemSlotDisplay(Items.CRAFTING_TABLE.builtInRegistryHolder())
+        ));
+    }
+
     @Override
     public NonNullList<ItemStack> getRemainingItems(CraftingInput input) {
         NonNullList<ItemStack> remaining = NonNullList.withSize(input.size(), ItemStack.EMPTY);

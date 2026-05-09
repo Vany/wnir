@@ -20,6 +20,9 @@
 texture same as hopper, but from mossy cobble.  recipe hoper + 5 mossy cobble: "M M", "MHM", " M ".~~
 
 
+## Visual / UX
+- [ ] **EE Clock metamorphosis indicator** — some animation/visual on the EE Clock column when it's actively growing something above (budding crystal, teleporter crystal, warding zigota). Talk with Vany about what form this should take before implementing.
+
 ## misc undecided.
 - [ ] Area spawn rate incrementer (like warding post, but for spawn rate)
 - [ ] Mob damager

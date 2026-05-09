@@ -51,9 +51,9 @@ public class EEClockBlockEntity extends BlockEntity {
             if (machine == null) return;
         }
 
-        // EEClockBuddingCrystalBlock manages its own growth by reading column height directly;
+        // ZygoteBlock manages its own growth by reading column height directly;
         // accelerating it via this mechanism would cause double-counting.
-        if (machineState.getBlock() instanceof EEClockBuddingCrystalBlock) return;
+        if (machineState.getBlock() instanceof ZygoteBlock) return;
         if (!(machineState.getBlock() instanceof net.minecraft.world.level.block.BaseEntityBlock entityBlock)) return;
         BlockEntityTicker<BlockEntity> ticker = EEClockBlock.getMachineTicker(level, machineState, entityBlock, machine);
         if (ticker == null) return;

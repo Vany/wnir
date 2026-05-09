@@ -1,16 +1,23 @@
 package com.wnir;
 
+import java.util.List;
 import net.minecraft.core.component.DataComponents;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.world.item.BlockItem;
 import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.ItemStackTemplate;
+import net.minecraft.world.item.Items;
 import net.minecraft.world.item.component.TypedEntityData;
 import com.mojang.serialization.MapCodec;
 import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.network.RegistryFriendlyByteBuf;
 import net.minecraft.world.item.crafting.CraftingInput;
 import net.minecraft.world.item.crafting.CustomRecipe;
+import net.minecraft.world.item.crafting.Ingredient;
 import net.minecraft.world.item.crafting.RecipeSerializer;
+import net.minecraft.world.item.crafting.display.RecipeDisplay;
+import net.minecraft.world.item.crafting.display.ShapelessCraftingRecipeDisplay;
+import net.minecraft.world.item.crafting.display.SlotDisplay;
 import net.minecraft.world.level.Level;
 
 /**
@@ -50,6 +57,16 @@ public class AccumulatorCombineRecipe extends CustomRecipe {
             count++;
         }
         return count >= 2;
+    }
+
+    @Override
+    public List<RecipeDisplay> display() {
+        SlotDisplay accum = Ingredient.of(WnirRegistries.ACCUMULATOR_BLOCK.get().asItem()).display();
+        return List.of(new ShapelessCraftingRecipeDisplay(
+            List.of(accum, accum),
+            new SlotDisplay.ItemStackSlotDisplay(new ItemStackTemplate(WnirRegistries.ACCUMULATOR_BLOCK.get().asItem())),
+            new SlotDisplay.ItemSlotDisplay(Items.CRAFTING_TABLE.builtInRegistryHolder())
+        ));
     }
 
     /** Sum capacity and energy from all input accumulators. */

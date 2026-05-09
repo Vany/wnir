@@ -21,6 +21,7 @@ import net.neoforged.neoforge.event.server.ServerStartingEvent;
 import net.neoforged.neoforge.event.server.ServerStoppingEvent;
 import net.neoforged.neoforge.network.event.RegisterPayloadHandlersEvent;
 import net.neoforged.neoforge.transfer.item.VanillaContainerWrapper;
+import net.neoforged.neoforge.transfer.item.WorldlyContainerWrapper;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
@@ -102,7 +103,7 @@ public class WnirMod {
         event.registerBlockEntity(
             Capabilities.Item.BLOCK,
             WnirRegistries.CELLULOSER_BE.get(),
-            (be, side) -> VanillaContainerWrapper.of(be)
+            (be, side) -> new WorldlyContainerWrapper(be, side)
         );
         event.registerBlockEntity(
             Capabilities.Energy.BLOCK,
@@ -161,8 +162,7 @@ public class WnirMod {
 
     private void onBlockPlaced(BlockEvent.EntityPlaceEvent event) {
         if (!(event.getLevel() instanceof ServerLevel level)) return;
-        EEClockBuddingCrystalBlock.tryTransformAt(level, event.getPos());
-        TeleporterCrystalBlock.tryTransformAt(level, event.getPos());
+        ZygoteBlock.tryTransformAt(level, event.getPos());
     }
 
     private void onRegisterBrewingRecipes(RegisterBrewingRecipesEvent event) {
