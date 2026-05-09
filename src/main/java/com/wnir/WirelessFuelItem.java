@@ -1,6 +1,7 @@
 package com.wnir;
 
 import net.minecraft.core.BlockPos;
+import net.minecraft.core.component.DataComponentPatch;
 import net.minecraft.core.component.DataComponents;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.nbt.CompoundTag;
@@ -13,6 +14,7 @@ import net.minecraft.world.InteractionResult;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.ItemStackTemplate;
 import net.minecraft.world.item.TooltipFlag;
 import net.minecraft.world.item.component.CustomData;
 import net.minecraft.world.item.component.CustomModelData;
@@ -76,8 +78,39 @@ public final class WirelessFuelItem extends Item {
     static final int  BURN_TIME          = 201;
     static final int  ACTIVE_DECAY_TICKS = 250;
 
+    // Cached reflective access to Item.craftingRemainingItem (type: ItemStackTemplate).
+    // Set to a blank template in the constructor so hasCraftingRemainingItem() returns
+    // true and the furnace replaces the slot instead of destroying the item.
+    // Updated to a data-carrying template in onFurnaceFuelBurnTime (which always fires
+    // immediately before consumeFuel on the same server thread) so the item returned
+    // after each burn keeps its link and buffer intact.
+    private static final java.lang.reflect.Field CRAFTING_REMAINING_FIELD;
+    static {
+        java.lang.reflect.Field f = null;
+        try {
+            f = net.minecraft.world.item.Item.class.getDeclaredField("craftingRemainingItem");
+            f.setAccessible(true);
+        } catch (NoSuchFieldException e) {
+            WnirMod.LOGGER.error("WirelessFuelItem: craftingRemainingItem field not found", e);
+        }
+        CRAFTING_REMAINING_FIELD = f;
+    }
+
     public WirelessFuelItem(Properties props) {
         super(props);
+        // craftingRemainingItem is intentionally left null here — builtInRegistryHolder()
+        // is not yet bound during item construction. The template is set in
+        // onFurnaceFuelBurnTime (which always fires on the same thread immediately
+        // before consumeFuel), so it's populated before the furnace ever reads it.
+    }
+
+    private void setRemainder(ItemStackTemplate template) {
+        if (CRAFTING_REMAINING_FIELD == null) return;
+        try {
+            CRAFTING_REMAINING_FIELD.set(this, template);
+        } catch (IllegalAccessException e) {
+            WnirMod.LOGGER.error("WirelessFuelItem: failed to set craftingRemainingItem", e);
+        }
     }
 
     // ── Linking ───────────────────────────────────────────────────────────────
@@ -118,11 +151,8 @@ public final class WirelessFuelItem extends Item {
         if (tag.getInt(KEY_STATE).orElse(STATE_NO_LINK) == STATE_NO_LINK) return 0;
         String dimStr = tag.getString(KEY_DIM).orElse("");
         if (dimStr.isEmpty()) return 0;
-        // Pure query — no side effects. getBurnTime is called for slot validation
-        // (isValidFuel) as well as for actual burning; deducting here causes phantom
-        // drain when the item is placed into an empty furnace that never ignites.
-        // The actual deduction happens in getCraftingRemainder, which is called
-        // exactly once per burn cycle when the furnace truly consumes the item.
+        // Pure query — no side effects. Deduction and template pre-load happen in
+        // onFurnaceFuelBurnTime, which fires via FurnaceFuelBurnTimeEvent.
         long buffer = tag.getLong(KEY_BUF).orElse(0L);
         return buffer >= FUEL_PER_USE ? BURN_TIME : 0;
     }
@@ -131,33 +161,6 @@ public final class WirelessFuelItem extends Item {
         tag.putInt(KEY_STATE, STATE_ERROR);
         save(stack, tag);
         setModelState(stack, STATE_ERROR);
-    }
-
-    // ── Permanent device ──────────────────────────────────────────────────────
-
-    @Override
-    @javax.annotation.Nullable
-    public net.minecraft.world.item.ItemStackTemplate getCraftingRemainder(net.minecraft.world.item.ItemInstance instance) {
-        if (!(instance instanceof ItemStack stack)) return null;
-        ItemStack copy = stack.copy();
-        copy.setCount(1);
-        // Deduct fuel cost here — called exactly once per burn cycle when the furnace
-        // actually replaces the consumed item with its remainder. Never called during
-        // slot validation, so this is the correct place for the side effect.
-        CompoundTag tag = getOrCreate(copy);
-        long buffer = tag.getLong(KEY_BUF).orElse(0L);
-        if (buffer >= FUEL_PER_USE) {
-            buffer -= FUEL_PER_USE;
-            tag.putLong(KEY_BUF, buffer);
-            MinecraftServer server = ServerLifecycleHooks.getCurrentServer();
-            if (server != null) {
-                tag.putInt(KEY_STATE, STATE_ACTIVE);
-                tag.putLong(KEY_ASINCE, server.overworld().getGameTime());
-            }
-            save(copy, tag);
-            setModelState(copy, STATE_ACTIVE);
-        }
-        return net.minecraft.world.item.ItemStackTemplate.fromNonEmptyStack(copy);
     }
 
     // ── Durability bar = buffer level ─────────────────────────────────────────
@@ -351,22 +354,25 @@ public final class WirelessFuelItem extends Item {
         }
     }
 
-    // ── Furnace slot fill (FurnaceFuelBurnTimeEvent) ──────────────────────────
+    // ── Furnace slot fill + crafting-remainder pre-load ───────────────────────
     //
-    // Fires when any furnace-type block queries burn time for an item in its fuel slot.
-    // If the wireless fuel's buffer is empty at that moment, we fill it here so the
-    // furnace can consume it immediately — no need to wait for the next server tick.
+    // Fires when any furnace-type block queries burn time (both for slot-validity
+    // checks and for actual burning). Two jobs:
     //
-    // JumboFurnace wraps getBurnTime inside a Transaction.openRoot(), so we would
-    // crash if we try to openRoot() here.  Catch the IllegalStateException and instead
-    // queue the item into PENDING_FURNACE_FILLS, which onServerTickPre drains BEFORE
-    // the next block-entity tick phase — so JumboFurnace sees a full buffer next tick.
+    // 1. Inline fill — if buffer is low, extract FE from the linked source now so
+    //    the furnace can light immediately. JumboFurnace wraps getBurnTime inside its
+    //    own Transaction.openRoot(), which would crash our openRoot(); we catch that
+    //    and queue into PENDING_FURNACE_FILLS instead (drained by onServerTickPre).
+    //
+    // 2. Template pre-load — AbstractFurnaceBlockEntity.consumeFuel() calls
+    //    Item.getCraftingRemainder() (public final) immediately after this event on
+    //    the same single server thread. We pre-load the craftingRemainingItem field
+    //    with a template that carries this stack's current data minus one use, so the
+    //    item that lands back in the fuel slot keeps its link and buffer intact.
 
     public static void onFurnaceFuelBurnTime(net.neoforged.neoforge.event.furnace.FurnaceFuelBurnTimeEvent event) {
-        // Skip if getBurnTime() already handled it (returned BURN_TIME, buffer was full)
-        if (event.getBurnTime() > 0) return;
         ItemStack stack = event.getItemStack();
-        if (!(stack.getItem() instanceof WirelessFuelItem)) return;
+        if (!(stack.getItem() instanceof WirelessFuelItem item)) return;
 
         CompoundTag tag = getOrCreate(stack);
         int state = tag.getInt(KEY_STATE).orElse(STATE_NO_LINK);
@@ -378,7 +384,7 @@ public final class WirelessFuelItem extends Item {
         long now = server.overworld().getGameTime();
         long buffer = tag.getLong(KEY_BUF).orElse(0L);
 
-        // Try to fill if below threshold
+        // ── Job 1: inline fill ────────────────────────────────────────────────
         if (buffer <= MAX_BUFFER / 2) {
             long retryTime = tag.getLong(KEY_RETRYTIME).orElse(0L);
             if (now - retryTime >= EXTRACT_RETRY_TICKS) {
@@ -411,8 +417,7 @@ public final class WirelessFuelItem extends Item {
                                     tx.commit();
                                 }
                             } catch (IllegalStateException ignored) {
-                                // Inside another mod's open transaction (e.g. JumboFurnace).
-                                // Queue for pre-fill before next block-entity tick phase.
+                                // Inside another mod's transaction — queue for pre-tick fill.
                                 PENDING_FURNACE_FILLS.add(stack);
                             }
                         } else {
@@ -424,12 +429,25 @@ public final class WirelessFuelItem extends Item {
             }
         }
 
-        // Report burn time if buffer is sufficient. No deduction here —
-        // getCraftingRemainder deducts when the furnace actually consumes the item.
         buffer = tag.getLong(KEY_BUF).orElse(0L);
-        if (buffer >= FUEL_PER_USE) {
-            event.setBurnTime(BURN_TIME);
-        }
+        if (buffer < FUEL_PER_USE) return;
+
+        // ── Job 2: pre-load remainder template with post-burn state ──────────
+        // consumeFuel() runs on the same thread immediately after this event.
+        // The template we set here is what Item.getCraftingRemainder() returns,
+        // so the fuel slot gets the item back with correct data.
+        CompoundTag nextTag = tag.copy();
+        nextTag.putLong(KEY_BUF, buffer - FUEL_PER_USE);
+        nextTag.putInt(KEY_STATE, STATE_ACTIVE);
+        nextTag.putLong(KEY_ASINCE, now);
+        DataComponentPatch patch = DataComponentPatch.builder()
+            .set(DataComponents.CUSTOM_DATA, CustomData.of(nextTag))
+            .set(DataComponents.CUSTOM_MODEL_DATA,
+                new CustomModelData(List.of((float) STATE_ACTIVE), List.of(), List.of(), List.of()))
+            .build();
+        item.setRemainder(new ItemStackTemplate(item, 1, patch));
+
+        event.setBurnTime(BURN_TIME);
     }
 
     // ── Pre-tick fill for furnace-slot items (JumboFurnace path) ─────────────

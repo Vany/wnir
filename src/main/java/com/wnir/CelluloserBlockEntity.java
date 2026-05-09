@@ -5,8 +5,10 @@ import net.minecraft.core.NonNullList;
 import net.minecraft.core.component.DataComponents;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerLevel;
+import net.minecraft.core.Direction;
 import net.minecraft.world.Container;
 import net.minecraft.world.ContainerHelper;
+import net.minecraft.world.WorldlyContainer;
 import net.minecraft.world.entity.player.Inventory;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.inventory.AbstractContainerMenu;
@@ -76,7 +78,7 @@ import java.util.Set;
  *   Energy: all faces insert; no extraction
  *   Fluid:  all faces → insert water (tank 0); all faces → extract cellulose (tank 1)
  */
-public class CelluloserBlockEntity extends BlockEntity implements Container, net.minecraft.world.MenuProvider {
+public class CelluloserBlockEntity extends BlockEntity implements WorldlyContainer, net.minecraft.world.MenuProvider {
 
     // ── Configurable parameters ──────────────────────────────────────────────
     public static final int XP_PER_TICK     = 200;
@@ -91,7 +93,6 @@ public class CelluloserBlockEntity extends BlockEntity implements Container, net
     static final int OUTPUT_SLOTS   = 9; // slots 1..OUTPUT_SLOTS are disassembly output
     static final int TOTAL_SLOTS    = 1 + OUTPUT_SLOTS;
     static final int DISASSEMBLY_XP = 80 * XP_PER_TICK; // extra processing time added per disassembly
-    static final int DISASSEMBLY_FE = 128;              // flat FE cost charged upfront per disassembly
 
     // Slot 0 = input; slots 1–9 = disassembly output
     private NonNullList<ItemStack> items = NonNullList.withSize(TOTAL_SLOTS, ItemStack.EMPTY);
@@ -101,8 +102,13 @@ public class CelluloserBlockEntity extends BlockEntity implements Container, net
     // Materials queued from disassembly — deposited into output slots once processing completes.
     private List<ItemStack> pendingMaterials = List.of();
 
-    // Recipe → material list cache. Populated lazily on first use.
-    private final Map<Item, List<ItemStack>> disassemblyCache = new HashMap<>();
+    // Recipe → all possible material lists cache. Populated lazily on first use.
+    private final Map<Item, List<List<ItemStack>>> disassemblyCache = new HashMap<>();
+
+    // Sticky recipe selection: once a recipe index is chosen for a run, keep it until the
+    // item is consumed (avoids re-rolling every tick when output slots are full).
+    private int  chosenRecipeIndex = -1;
+    private Item chosenRecipeItem  = null;
 
     /**
      * Two-tank fluid handler.
@@ -233,8 +239,32 @@ public class CelluloserBlockEntity extends BlockEntity implements Container, net
 
     @Override
     public boolean canPlaceItem(int slot, ItemStack stack) {
-        if (slot != 0) return false; // output slots are read-only
+        if (slot != 0) return false;
         return isEnchanted(stack) || isConfigSource(stack) || isDisassemblableItem(stack);
+    }
+
+    // ── WorldlyContainer ─────────────────────────────────────────────────────
+
+    private static final int[] ALL_SLOTS;
+    private static final int[] OUTPUT_SLOT_IDS;
+    static {
+        ALL_SLOTS = new int[TOTAL_SLOTS];
+        for (int i = 0; i < TOTAL_SLOTS; i++) ALL_SLOTS[i] = i;
+        OUTPUT_SLOT_IDS = new int[OUTPUT_SLOTS];
+        for (int i = 0; i < OUTPUT_SLOTS; i++) OUTPUT_SLOT_IDS[i] = i + 1;
+    }
+
+    @Override
+    public int[] getSlotsForFace(Direction side) { return ALL_SLOTS; }
+
+    @Override
+    public boolean canPlaceItemThroughFace(int slot, ItemStack stack, @org.jspecify.annotations.Nullable Direction dir) {
+        return canPlaceItem(slot, stack);
+    }
+
+    @Override
+    public boolean canTakeItemThroughFace(int slot, ItemStack stack, Direction dir) {
+        return slot != 0; // only output slots 1-9 are extractable
     }
 
     static boolean isConfigSource(ItemStack stack) {
@@ -305,7 +335,7 @@ public class CelluloserBlockEntity extends BlockEntity implements Container, net
 
                 boolean disassemble = isDisassemblableItem(input);
                 // Remaining-health fraction: 1.0 = pristine, 0.0 = fully broken.
-                // Scales both processing time and upfront FE for disassembly.
+                // Scales processing time for disassembly.
                 float survivalProb = (disassemble && input.getMaxDamage() > 0)
                     ? 1.0f - (float) input.getDamageValue() / input.getMaxDamage()
                     : 1.0f;
@@ -313,24 +343,29 @@ public class CelluloserBlockEntity extends BlockEntity implements Container, net
                 if (xp > 0 || disassemble) {
                     List<ItemStack> mats = List.of();
                     if (disassemble && level.getRandom().nextFloat() < survivalProb) {
-                        mats = be.getDisassemblyMaterials(input.getItem(), level);
+                        Item inputItem = input.getItem();
+                        // Reset sticky index if a different item entered slot 0
+                        if (inputItem != be.chosenRecipeItem) {
+                            be.chosenRecipeIndex = -1;
+                            be.chosenRecipeItem  = inputItem;
+                        }
+                        List<List<ItemStack>> allRecipes = be.getAllDisassemblyRecipes(inputItem, level);
+                        if (!allRecipes.isEmpty()) {
+                            if (be.chosenRecipeIndex < 0) {
+                                be.chosenRecipeIndex = level.getRandom().nextInt(allRecipes.size());
+                            }
+                            mats = allRecipes.get(be.chosenRecipeIndex);
+                        }
                     }
 
                     int scaledXp = Math.max(1, (int)(DISASSEMBLY_XP * survivalProb));
-                    int scaledFe = Math.max(1, (int)(DISASSEMBLY_FE * survivalProb));
-
-                    boolean needsDisassemblyFe = !mats.isEmpty();
-                    boolean hasDisassemblyFe   = !needsDisassemblyFe
-                        || be.energyHandler.getAmountAsInt() >= scaledFe;
 
                     boolean canProcess = (xp > 0 || !mats.isEmpty())
-                        && (mats.isEmpty() || be.canFitMaterials(mats))
-                        && hasDisassemblyFe;
+                        && (mats.isEmpty() || be.canFitMaterials(mats));
                     if (canProcess) {
-                        if (needsDisassemblyFe) {
-                            be.energyHandler.set(be.energyHandler.getAmountAsInt() - scaledFe);
-                        }
                         input.shrink(1);
+                        be.chosenRecipeIndex = -1;
+                        be.chosenRecipeItem  = null;
                         int totalXp = xp + (!mats.isEmpty() ? scaledXp : 0);
                         if (totalXp > 0) {
                             be.remainingXp = totalXp;
@@ -378,39 +413,36 @@ public class CelluloserBlockEntity extends BlockEntity implements Container, net
     // ── Disassembly ──────────────────────────────────────────────────────────
 
     /**
-     * Returns cached material list for disassembling the given item.
-     * Each call returns a snapshot copy — callers must not mutate the stacks.
+     * Returns all possible material lists for disassembling the given item (cached).
+     * Each inner list is a snapshot — callers must not mutate the stacks.
      */
-    List<ItemStack> getDisassemblyMaterials(Item item, Level level) {
-        return disassemblyCache.computeIfAbsent(item, k ->
-            resolveRecipe(k, level, new HashSet<>())
-                .stream().map(ItemStack::copy).toList()
-        );
+    List<List<ItemStack>> getAllDisassemblyRecipes(Item item, Level level) {
+        return disassemblyCache.computeIfAbsent(item, k -> resolveAllRecipes(k, level, new HashSet<>()));
     }
 
     /**
-     * Recursively resolves disassembly materials via recipe lookup.
+     * Collects every valid disassembly material list for {@code target}.
      *
-     * Smithing recipe (base + template + addition → result):
-     *   returns materials of base item (recursive) + the addition ingredient (netherite ingot).
-     *   Template is excluded — it is consumed in smithing but returned by the table.
+     * Smithing recipes (base + template + addition → result):
+     *   materials = recursive base materials + addition ingredient.
+     *   Template excluded — the table returns it.
      *
-     * Crafting recipe:
-     *   skipped if any ingredient slot contains an item with EQUIPPABLE component (repair/upgrade recipes).
-     *   Otherwise returns merged ingredient list (first option per slot, counts summed by item type).
+     * Crafting recipes:
+     *   skipped when any ingredient has EQUIPPABLE (repair/upgrade recipes).
+     *   Each matching recipe becomes a separate entry in the result list.
+     *
+     * Returns an empty list when no recipe is found.
      */
-    private static List<ItemStack> resolveRecipe(Item target, Level level, Set<Item> visited) {
-        if (!visited.add(target)) return List.of(); // cycle guard
+    private static List<List<ItemStack>> resolveAllRecipes(Item target, Level level, Set<Item> visited) {
+        if (!visited.add(target)) return List.of();
 
         RecipeManager rm = ((ServerLevel) level).recipeAccess();
+        List<List<ItemStack>> results = new ArrayList<>();
 
         // ── Smithing recipes ─────────────────────────────────────────────────
-        // assemble() takes only the input (no HolderLookup.Provider in 1.21.11)
-        Collection<RecipeHolder<SmithingRecipe>> smithingRecipes = rm.recipeMap().byType(RecipeType.SMITHING);
-        for (RecipeHolder<SmithingRecipe> holder : smithingRecipes) {
+        for (RecipeHolder<SmithingRecipe> holder : rm.recipeMap().byType(RecipeType.SMITHING)) {
             if (!(holder.value() instanceof SmithingTransformRecipe recipe)) continue;
 
-            // Get first base item option; skip recipe if none
             var baseFirst = recipe.baseIngredient().items().findFirst();
             if (baseFirst.isEmpty()) continue;
             ItemStack testBase = new ItemStack(baseFirst.get().value());
@@ -425,19 +457,15 @@ public class CelluloserBlockEntity extends BlockEntity implements Container, net
             ItemStack result = recipe.assemble(new SmithingRecipeInput(testTemplate, testBase, testAddition));
             if (result.isEmpty() || result.getItem() != target) continue;
 
-            // Found: recurse into base armor, then add the addition (netherite ingot)
-            List<ItemStack> mats = new ArrayList<>(resolveRecipe(testBase.getItem(), level, visited));
+            List<ItemStack> mats = new ArrayList<>(resolveRecipeFirst(testBase.getItem(), level, new HashSet<>(visited)));
             recipe.additionIngredient().ifPresent(addIng ->
                 addIng.items().findFirst().ifPresent(h -> mats.add(new ItemStack(h.value(), 1)))
             );
-            return mats;
+            if (!mats.isEmpty()) results.add(mats);
         }
 
         // ── Crafting recipes ─────────────────────────────────────────────────
-        // Vanilla shaped/shapeless recipes ignore the input and return the stored result.
-        // Modded recipes may index into the input and crash on CraftingInput.EMPTY — skip those.
-        Collection<RecipeHolder<CraftingRecipe>> craftingRecipes = rm.recipeMap().byType(RecipeType.CRAFTING);
-        for (RecipeHolder<CraftingRecipe> holder : craftingRecipes) {
+        for (RecipeHolder<CraftingRecipe> holder : rm.recipeMap().byType(RecipeType.CRAFTING)) {
             CraftingRecipe recipe = holder.value();
 
             ItemStack result;
@@ -448,29 +476,34 @@ public class CelluloserBlockEntity extends BlockEntity implements Container, net
             }
             if (result == null || result.isEmpty() || result.getItem() != target) continue;
 
-            // Skip repair/upgrade recipes that contain equipped-slot items as ingredients
             List<Ingredient> ings = recipe.placementInfo().ingredients();
             boolean hasEquippableIng = ings.stream().anyMatch(ing ->
                 ing.items().anyMatch(h -> new ItemStack(h.value()).has(DataComponents.EQUIPPABLE))
             );
             if (hasEquippableIng) continue;
 
-            // Merge ingredient counts by item type (take first option per slot)
             Map<Item, Integer> counts = new LinkedHashMap<>();
             for (Ingredient ing : ings) {
                 ing.items().findFirst().map(Holder::value).ifPresent(item ->
                     counts.merge(item, 1, Integer::sum)
                 );
             }
-
             List<ItemStack> mats = new ArrayList<>();
             for (var e : counts.entrySet()) {
                 mats.add(new ItemStack(e.getKey(), e.getValue()));
             }
-            return mats;
+            if (!mats.isEmpty()) results.add(mats);
         }
 
-        return List.of();
+        return results.isEmpty() ? List.of() : List.copyOf(results);
+    }
+
+    /**
+     * Returns the first matching material list for {@code target} — used for smithing base recursion.
+     */
+    private static List<ItemStack> resolveRecipeFirst(Item target, Level level, Set<Item> visited) {
+        List<List<ItemStack>> all = resolveAllRecipes(target, level, visited);
+        return all.isEmpty() ? List.of() : all.get(0);
     }
 
     /** Returns true if all materials can fit into output slots 1–OUTPUT_SLOTS. */
