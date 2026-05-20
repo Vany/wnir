@@ -40,8 +40,8 @@ public final class MouseyCompassSearchManager {
 
     private MouseyCompassSearchManager() {}
 
-    public static void startSearch(UUID playerId, Identifier targetBlock, ChunkPos startChunk) {
-        tasks.put(playerId, new SearchTask(targetBlock, startChunk));
+    public static void startSearch(UUID playerId, Identifier targetBlock, ChunkPos startChunk, int yMin, int yMax) {
+        tasks.put(playerId, new SearchTask(targetBlock, startChunk, yMin, yMax));
     }
 
     public static void cancel(UUID playerId) {
@@ -96,7 +96,7 @@ public final class MouseyCompassSearchManager {
             return new TickResult(null, null, -1);
         }
 
-        BlockPos found = scanChunk(level, next, target);
+        BlockPos found = scanChunk(level, next, target, task.yMin, task.yMax);
         if (found != null) {
             tasks.remove(playerId);
             return new TickResult(found, next, newRadius);
@@ -106,7 +106,7 @@ public final class MouseyCompassSearchManager {
         return new TickResult(null, next, newRadius);
     }
 
-    private static BlockPos scanChunk(ServerLevel level, ChunkPos cp, Block target) {
+    private static BlockPos scanChunk(ServerLevel level, ChunkPos cp, Block target, int yMin, int yMax) {
         LevelChunk chunk = level.getChunk(cp.x(), cp.z());
         LevelChunkSection[] sections = chunk.getSections();
         int minSection = level.getMinY() / 16;
@@ -116,12 +116,16 @@ public final class MouseyCompassSearchManager {
         for (int i = 0; i < sections.length; i++) {
             LevelChunkSection section = sections[i];
             if (section.hasOnlyAir()) continue;
-            // Palette check — O(palette size), skips entire section if block absent
-            if (!section.getStates().maybeHas(state -> state.is(target))) continue;
 
             int baseY = (minSection + i) * 16;
+            if (baseY + 15 < yMin || baseY > yMax) continue; // section entirely outside Y range
+
+            if (!section.getStates().maybeHas(state -> state.is(target))) continue;
+
+            int startY = Math.max(0, yMin - baseY);
+            int endY   = Math.min(15, yMax - baseY);
             for (int x = 0; x < 16; x++) {
-                for (int y = 0; y < 16; y++) {
+                for (int y = startY; y <= endY; y++) {
                     for (int z = 0; z < 16; z++) {
                         if (level.getBlockState(new BlockPos(minX + x, baseY + y, minZ + z)).is(target)) {
                             return new BlockPos(minX + x, baseY + y, minZ + z);
@@ -138,13 +142,16 @@ public final class MouseyCompassSearchManager {
     private static final class SearchTask {
         final Identifier targetBlock;
         final ChunkPos originChunk;
+        final int yMin, yMax;
         final Set<ChunkPos> visited  = new HashSet<>();
         final Set<ChunkPos> frontier = new HashSet<>();
         int lastReportedRadius = 0;
 
-        SearchTask(Identifier targetBlock, ChunkPos start) {
+        SearchTask(Identifier targetBlock, ChunkPos start, int yMin, int yMax) {
             this.targetBlock = targetBlock;
             this.originChunk = start;
+            this.yMin = yMin;
+            this.yMax = yMax;
             frontier.add(start);
         }
 

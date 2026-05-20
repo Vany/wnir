@@ -342,7 +342,9 @@ public class CelluloserBlockEntity extends BlockEntity implements WorldlyContain
 
                 if (xp > 0 || disassemble) {
                     List<ItemStack> mats = List.of();
-                    if (disassemble && level.getRandom().nextFloat() < survivalProb) {
+                    boolean hasAnyRecipe = false;
+
+                    if (disassemble) {
                         Item inputItem = input.getItem();
                         // Reset sticky index if a different item entered slot 0
                         if (inputItem != be.chosenRecipeItem) {
@@ -350,7 +352,8 @@ public class CelluloserBlockEntity extends BlockEntity implements WorldlyContain
                             be.chosenRecipeItem  = inputItem;
                         }
                         List<List<ItemStack>> allRecipes = be.getAllDisassemblyRecipes(inputItem, level);
-                        if (!allRecipes.isEmpty()) {
+                        hasAnyRecipe = !allRecipes.isEmpty();
+                        if (hasAnyRecipe && level.getRandom().nextFloat() < survivalProb) {
                             if (be.chosenRecipeIndex < 0) {
                                 be.chosenRecipeIndex = level.getRandom().nextInt(allRecipes.size());
                             }
@@ -373,7 +376,13 @@ public class CelluloserBlockEntity extends BlockEntity implements WorldlyContain
                         }
                         if (!mats.isEmpty()) be.pendingMaterials = List.copyOf(mats);
                         changed = true;
+                    } else if (xp == 0 && (!hasAnyRecipe || survivalProb <= 0)) {
+                        // No recipe, or fully broken (survival can never pass) — pass through
+                        if (be.passThrough(input)) changed = true;
                     }
+                } else {
+                    // Accepted by canPlaceItem (e.g. config source with xp=0) but nothing to do
+                    if (be.passThrough(input)) changed = true;
                 }
             }
         }
@@ -558,6 +567,28 @@ public class CelluloserBlockEntity extends BlockEntity implements WorldlyContain
             }
         }
         return true;
+    }
+
+    // ── Pass-through ─────────────────────────────────────────────────────────
+
+    /** Moves one item from slot 0 into the first output slot that has room. Returns true if moved. */
+    private boolean passThrough(ItemStack stack) {
+        ItemStack single = stack.copyWithCount(1);
+        for (int i = 1; i <= OUTPUT_SLOTS; i++) {
+            ItemStack existing = items.get(i);
+            if (existing.isEmpty()) {
+                items.set(i, single);
+                stack.shrink(1);
+                return true;
+            }
+            if (ItemStack.isSameItemSameComponents(existing, single)
+                    && existing.getCount() < existing.getMaxStackSize()) {
+                existing.grow(1);
+                stack.shrink(1);
+                return true;
+            }
+        }
+        return false;
     }
 
     // ── XP calculation ───────────────────────────────────────────────────────

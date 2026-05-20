@@ -12,6 +12,7 @@ import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.inventory.AbstractContainerMenu;
 import net.minecraft.world.inventory.ContainerData;
 import net.minecraft.world.item.ItemStack;
+import net.minecraft.core.particles.DustParticleOptions;
 import net.minecraft.core.particles.ParticleTypes;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.entity.BlockEntity;
@@ -50,11 +51,22 @@ public class ZygoteBlockEntity extends BlockEntity implements MenuProvider {
             be.cachedClocks = countEEClocksBelow(level, pos);
         }
         int clocks = be.cachedClocks;
-        if (clocks == 0) return;
 
-        ZygoteVariant v       = be.variant();
-        int           baseTicks  = v.baseTicks;
-        int           totalFuel  = v.fuelCount;
+        ZygoteVariant v         = be.variant();
+        int           baseTicks = v.baseTicks;
+        int           totalFuel = v.fuelCount;
+
+        // No-fuel dust warning: 8× base rate (1/25 per tick), shown even without clocks
+        if (totalFuel > 0 && level instanceof ServerLevel slDust) {
+            ItemStack fuelSlot = be.fuelContainer.getItem(0);
+            if ((fuelSlot.isEmpty() || !fuelSlot.is(v.fuelItem)) && slDust.getRandom().nextInt(25) == 0) {
+                slDust.sendParticles(new DustParticleOptions(0xFF8000, 1.0f),
+                    pos.getX() + 0.5, pos.getY() + 1.1, pos.getZ() + 0.5,
+                    1, 0.3, 0.2, 0.3, 0.0);
+            }
+        }
+
+        if (clocks == 0) return;
 
         if (totalFuel == 0) {
             be.ticksAccumulated = Math.min(be.ticksAccumulated + clocks, baseTicks);
@@ -89,8 +101,8 @@ public class ZygoteBlockEntity extends BlockEntity implements MenuProvider {
             return;
         }
 
-        // ~1 particle per 10 seconds while actively growing
-        if (level instanceof ServerLevel sl && sl.getRandom().nextInt(200) == 0) {
+        // Working particles: rate scales with clocks (base 1/200 per tick, doubled per extra clock)
+        if (level instanceof ServerLevel sl && sl.getRandom().nextInt(Math.max(1, 200 / clocks)) == 0) {
             sl.sendParticles(ParticleTypes.HAPPY_VILLAGER,
                 pos.getX() + 0.5, pos.getY() + 1.1, pos.getZ() + 0.5,
                 1, 0.3, 0.2, 0.3, 0.0);

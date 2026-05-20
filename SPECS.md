@@ -288,8 +288,11 @@ Compass item that searches loaded chunks in a BFS spiral for a target block type
 | `"target"` | String | Registry ID of block being searched |
 | `"searching"` | boolean | Search in progress |
 | `"fx"/"fy"/"fz"` | int | Found position (tooltip display) |
+| `"yMode"` | int | Height filter: 0=all, 1=±32 from player Y, 2=±16 from player Y |
 
 **`LODESTONE_TRACKER`** drives the needle: empty optional → spins; `GlobalPos` set → points.
+
+**Height filter cycling:** Right-click while searching with no applicable offhand item cycles the Y mode (0→1→2→0). Each cycle restarts BFS from the player's current chunk with the new Y bounds. Modes: all heights → ±32 from current player Y → ±16 from current player Y → all heights. Tooltip shows `[±32]` or `[±16]` suffix when active. Overlay message confirms the active mode on each cycle.
 
 **Tick handler (`onPlayerTick`):** runs each server tick while compass is in main hand and `searching=true`. Delegates one chunk per tick to `MouseyCompassSearchManager`. Points needle at scanned chunk center. On found: calls `lock()` (sets tracker, glint). On exhausted: clears searching flag.
 

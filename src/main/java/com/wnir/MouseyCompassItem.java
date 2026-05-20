@@ -9,6 +9,7 @@ import net.minecraft.network.chat.Component;
 import net.minecraft.resources.Identifier;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.server.level.ServerLevel;
+import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.InteractionResult;
 import net.minecraft.world.entity.player.Player;
@@ -28,6 +29,7 @@ import net.neoforged.neoforge.event.tick.PlayerTickEvent;
 
 import java.util.Locale;
 import java.util.Optional;
+import java.util.Set;
 import java.util.function.Consumer;
 
 /**
@@ -46,11 +48,13 @@ import java.util.function.Consumer;
  */
 public final class MouseyCompassItem extends Item {
 
-    private static final String KEY_TARGET    = "target";
-    private static final String KEY_SEARCHING = "searching";
-    private static final String KEY_FOUND_X   = "fx";
-    private static final String KEY_FOUND_Y   = "fy";
-    private static final String KEY_FOUND_Z   = "fz";
+    static final String KEY_TARGET    = "target";
+    static final String KEY_SEARCHING = "searching";
+    static final String KEY_FOUND_X   = "fx";
+    static final String KEY_FOUND_Y   = "fy";
+    static final String KEY_FOUND_Z   = "fz";
+    static final String KEY_Y_MODE    = "yMode";   // 0=all, 1=±32, 2=±16
+    static final String KEY_RADIUS    = "radius";  // current search chunk radius (synced to client)
 
     public MouseyCompassItem(Properties props) {
         super(props);
@@ -62,9 +66,20 @@ public final class MouseyCompassItem extends Item {
     public InteractionResult use(Level level, Player player, InteractionHand hand) {
         if (hand != InteractionHand.MAIN_HAND) return InteractionResult.PASS;
 
-        ItemStack offhand = player.getOffhandItem();
+        ItemStack compass  = player.getItemInHand(hand);
+        ItemStack offhand  = player.getOffhandItem();
+        boolean hasBlock   = offhand.getItem() instanceof BlockItem;
+        boolean hasNameTag = offhand.is(Items.NAME_TAG) && offhand.has(DataComponents.CUSTOM_NAME);
 
-        if (offhand.getItem() instanceof BlockItem blockItem) {
+        // Right-click while searching with no applicable offhand item → cycle Y mode
+        if (isSearching(compass) && !hasBlock && !hasNameTag) {
+            if (!level.isClientSide()) {
+                cycleYMode(compass, player, (ServerLevel) level);
+            }
+            return InteractionResult.SUCCESS;
+        }
+
+        if (hasBlock && offhand.getItem() instanceof BlockItem blockItem) {
             // Block in offhand — search by registry ID
             if (!level.isClientSide()) {
                 Identifier targetId = BuiltInRegistries.BLOCK.getKey(blockItem.getBlock());
@@ -74,7 +89,7 @@ public final class MouseyCompassItem extends Item {
             return InteractionResult.SUCCESS;
         }
 
-        if (offhand.is(Items.NAME_TAG) && offhand.has(DataComponents.CUSTOM_NAME)) {
+        if (hasNameTag) {
             // Anvil-renamed paper in offhand — search by block display name
             if (!level.isClientSide()) {
                 String name = offhand.get(DataComponents.CUSTOM_NAME).getString();
@@ -103,12 +118,21 @@ public final class MouseyCompassItem extends Item {
         if (player.level().isClientSide()) return;
 
         ItemStack main = player.getMainHandItem();
-        boolean holdingSearching = main.getItem() instanceof MouseyCompassItem && isSearching(main);
+        if (!(main.getItem() instanceof MouseyCompassItem)) {
+            if (MouseyCompassSearchManager.isSearching(player.getUUID())) cancelSearch(player);
+            return;
+        }
 
-        if (!holdingSearching) {
-            // Lost focus — cancel any running search and clear flag from inventory
-            if (MouseyCompassSearchManager.isSearching(player.getUUID())) {
-                cancelSearch(player);
+        if (!isSearching(main)) {
+            if (MouseyCompassSearchManager.isSearching(player.getUUID())) cancelSearch(player);
+            // Show live distance to found block every tick while held
+            CompoundTag ft = getOrCreate(main);
+            if (ft.contains(KEY_FOUND_X)) {
+                int fx = ft.getInt(KEY_FOUND_X).orElse(0);
+                int fy = ft.getInt(KEY_FOUND_Y).orElse(0);
+                int fz = ft.getInt(KEY_FOUND_Z).orElse(0);
+                double dx = fx - player.getX(), dy = fy - player.getY(), dz = fz - player.getZ();
+                player.sendOverlayMessage(Component.literal((int) Math.sqrt(dx*dx + dy*dy + dz*dz) + " blocks"));
             }
             return;
         }
@@ -133,15 +157,34 @@ public final class MouseyCompassItem extends Item {
                 new LodestoneTracker(Optional.of(GlobalPos.of(level.dimension(), chunkCenter)), false));
         }
 
-        // Caption when radius ring increases
+        // Update stored radius when ring expands
         if (result.newRadius() > 0) {
-            player.sendOverlayMessage(Component.literal("Searching... " + result.newRadius() + " chunks"));
+            CompoundTag tag = getOrCreate(main);
+            tag.putInt(KEY_RADIUS, result.newRadius());
+            save(main, tag);
         }
+
+        // Overlay every tick — resets fade timer, keeping it visible while searching
+        CompoundTag tag = getOrCreate(main);
+        int radius = tag.getInt(KEY_RADIUS).orElse(0);
+        int yMode  = tag.getInt(KEY_Y_MODE).orElse(0);
+        String suffix = switch (yMode) { case 1 -> " [±32]"; case 2 -> " [±16]"; default -> ""; };
+        player.sendOverlayMessage(Component.literal(
+            radius > 0 ? radius * 16 + " blocks" + suffix : "Searching..."));
 
         if (result.found() != null) {
             lock(main, result.found(), level.dimension());
-            player.sendOverlayMessage(Component.literal(
-                "Found at " + result.found().getX() + ", " + result.found().getY() + ", " + result.found().getZ()));
+            BlockPos freePos = findFreeSpace(level, result.found());
+            if (freePos != null && hasNbtWiper(player) && player instanceof ServerPlayer sp) {
+                sp.teleportTo(level, freePos.getX() + 0.5, freePos.getY(), freePos.getZ() + 0.5,
+                    Set.of(), player.getYRot(), player.getXRot(), false);
+                consumeNbtWiper(player);
+                player.sendOverlayMessage(Component.literal(
+                    "Teleported to " + result.found().getX() + ", " + result.found().getY() + ", " + result.found().getZ()));
+            } else {
+                player.sendOverlayMessage(Component.literal(
+                    "Found at " + result.found().getX() + ", " + result.found().getY() + ", " + result.found().getZ()));
+            }
         } else if (!MouseyCompassSearchManager.isSearching(player.getUUID())) {
             // Search exhausted without finding
             clearSearching(main);
@@ -171,7 +214,13 @@ public final class MouseyCompassItem extends Item {
         consumer.accept(Component.literal("Target: ").append(block.getName()));
 
         if (isSearching(stack)) {
-            consumer.accept(Component.literal("Searching..."));
+            int yMode = getOrCreate(stack).getInt(KEY_Y_MODE).orElse(0);
+            String range = switch (yMode) {
+                case 1 -> " [±32]";
+                case 2 -> " [±16]";
+                default -> "";
+            };
+            consumer.accept(Component.literal("Searching..." + range));
         } else {
             BlockPos found = getFoundPos(stack);
             if (found != null) {
@@ -201,6 +250,8 @@ public final class MouseyCompassItem extends Item {
         CompoundTag tag = getOrCreate(stack);
         tag.putString(KEY_TARGET, targetId.toString());
         tag.putBoolean(KEY_SEARCHING, true);
+        tag.putInt(KEY_Y_MODE, 0);
+        tag.putInt(KEY_RADIUS, 0);
         tag.remove(KEY_FOUND_X); tag.remove(KEY_FOUND_Y); tag.remove(KEY_FOUND_Z);
         save(stack, tag);
 
@@ -209,9 +260,37 @@ public final class MouseyCompassItem extends Item {
 
         BlockPos startPos = player.blockPosition();
         MouseyCompassSearchManager.startSearch(
-            player.getUUID(), targetId, new ChunkPos(startPos.getX() >> 4, startPos.getZ() >> 4)
+            player.getUUID(), targetId,
+            new ChunkPos(startPos.getX() >> 4, startPos.getZ() >> 4),
+            Integer.MIN_VALUE, Integer.MAX_VALUE
         );
         player.sendOverlayMessage(Component.literal("Searching for " + targetId.getPath() + "..."));
+    }
+
+    private static void cycleYMode(ItemStack stack, Player player, ServerLevel level) {
+        CompoundTag tag = getOrCreate(stack);
+        int mode = (tag.getInt(KEY_Y_MODE).orElse(0) + 1) % 3;
+        tag.putInt(KEY_Y_MODE, mode);
+        save(stack, tag);
+
+        int playerY = player.getBlockY();
+        int yMin, yMax;
+        String msg;
+        switch (mode) {
+            case 1 -> { yMin = playerY - 32; yMax = playerY + 32; msg = "Height ±32 from Y=" + playerY; }
+            case 2 -> { yMin = playerY - 16; yMax = playerY + 16; msg = "Height ±16 from Y=" + playerY; }
+            default -> { yMin = Integer.MIN_VALUE; yMax = Integer.MAX_VALUE; msg = "All heights"; }
+        }
+        player.sendOverlayMessage(Component.literal(msg));
+
+        Identifier targetId = getTargetId(stack);
+        if (targetId == null) return;
+        BlockPos startPos = player.blockPosition();
+        MouseyCompassSearchManager.startSearch(
+            player.getUUID(), targetId,
+            new ChunkPos(startPos.getX() >> 4, startPos.getZ() >> 4),
+            yMin, yMax
+        );
     }
 
     private static void lock(ItemStack stack, BlockPos pos, ResourceKey<Level> dimension) {
@@ -233,6 +312,51 @@ public final class MouseyCompassItem extends Item {
         save(stack, tag);
         stack.set(DataComponents.LODESTONE_TRACKER, new LodestoneTracker(Optional.empty(), false));
         stack.remove(DataComponents.ENCHANTMENT_GLINT_OVERRIDE);
+    }
+
+    private static boolean hasNbtWiper(Player player) {
+        var inv = player.getInventory();
+        for (int i = 0; i < inv.getContainerSize(); i++) {
+            ItemStack s = inv.getItem(i);
+            if (!s.isEmpty() && s.is(WnirRegistries.NBT_WIPER_LIQUID_ITEM.get())) return true;
+        }
+        return false;
+    }
+
+    /** Consumes one nbt_wiper_liquid from the player's inventory; returns true if found. */
+    private static boolean consumeNbtWiper(Player player) {
+        var inv = player.getInventory();
+        for (int i = 0; i < inv.getContainerSize(); i++) {
+            ItemStack s = inv.getItem(i);
+            if (!s.isEmpty() && s.is(WnirRegistries.NBT_WIPER_LIQUID_ITEM.get())) {
+                s.shrink(1);
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
+     * 3D Chebyshev shell search — returns the nearest air block to origin.
+     * Accepts 1×1×1 or larger air spaces; both are valid teleport destinations.
+     */
+    private static BlockPos findFreeSpace(ServerLevel level, BlockPos origin) {
+        for (int r = 1; r <= 16; r++) {
+            for (int dx = -r; dx <= r; dx++) {
+                for (int dy = -r; dy <= r; dy++) {
+                    for (int dz = -r; dz <= r; dz++) {
+                        if (Math.abs(dx) < r && Math.abs(dy) < r && Math.abs(dz) < r) continue;
+                        BlockPos pos = origin.offset(dx, dy, dz);
+                        int y = pos.getY();
+                        if (y < level.getMinY() || y >= level.getMaxY()) continue;
+                        if (!level.getBlockState(pos.below()).isAir()
+                                && level.getBlockState(pos).isAir()
+                                && level.getBlockState(pos.above()).isAir()) return pos;
+                    }
+                }
+            }
+        }
+        return null;
     }
 
     private static void cancelSearch(Player player) {
