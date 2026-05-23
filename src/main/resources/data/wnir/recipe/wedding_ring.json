@@ -1,0 +1,17 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "pattern": [
+    "DGD",
+    "GGG",
+    "GGG"
+  ],
+  "key": {
+    "D": "minecraft:diamond",
+    "G": "minecraft:gold_ingot"
+  },
+  "result": {
+    "id": "wnir:wedding_ring",
+    "count": 1
+  },
+  "category": "misc"
+}

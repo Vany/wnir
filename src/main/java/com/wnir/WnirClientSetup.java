@@ -6,6 +6,9 @@ import net.minecraft.resources.Identifier;
 import net.neoforged.api.distmarker.Dist;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.common.EventBusSubscriber;
+import net.neoforged.fml.event.lifecycle.FMLClientSetupEvent;
+import net.neoforged.neoforge.client.event.RenderGuiEvent;
+import net.neoforged.neoforge.common.NeoForge;
 import net.neoforged.neoforge.client.event.EntityRenderersEvent;
 import net.neoforged.neoforge.client.event.RegisterFluidModelsEvent;
 import net.neoforged.neoforge.client.extensions.common.RegisterClientExtensionsEvent;
@@ -63,6 +66,11 @@ public class WnirClientSetup {
     }
 
     @SubscribeEvent
+    public static void onClientSetup(FMLClientSetupEvent event) {
+        NeoForge.EVENT_BUS.addListener(WeddingRingCaptionRenderer::onRenderGui);
+    }
+
+    @SubscribeEvent
     public static void onRegisterMenuScreens(RegisterMenuScreensEvent event) {
         event.register(WnirRegistries.MOSSY_HOPPER_MENU.get(),  WnirHopperScreen.factory("mossy_hopper"));
         event.register(WnirRegistries.STEEL_HOPPER_MENU.get(),  WnirHopperScreen.factory("steel_hopper"));
@@ -73,5 +81,6 @@ public class WnirClientSetup {
         event.register(WnirRegistries.SKULL_BEEHIVE_MENU.get(), SkullBeehiveScreen::new);
         event.register(WnirRegistries.CELLULOSER_MENU.get(), CelluloserScreen::new);
         event.register(WnirRegistries.TRADER_MENU.get(), TraderScreen::new);
+        event.register(WnirRegistries.WEDDING_RING_MENU.get(), WeddingRingScreen::new);
     }
 }

@@ -186,5 +186,25 @@
 
   "item.wnir.nbt_wiper_liquid": "NBT Wiper",
   "tooltip.wnir.nbt_wiper_liquid": "Strips all data from an item.",
-  "tooltip.wnir.nbt_wiper_liquid.detail": "Craft with any item to remove enchantments, names, and all other data. Returns a brand-new copy. Crafted from Magic Cellulose + 3 Glass Bottles → 3 wipers."
+  "tooltip.wnir.nbt_wiper_liquid.detail": "Craft with any item to remove enchantments, names, and all other data. Returns a brand-new copy. Crafted from Magic Cellulose + 3 Glass Bottles → 3 wipers.",
+
+  "item.wnir.wedding_ring": "Pair of Wedding Rings",
+  "item.wnir.wedding_ring.bound": "Bound to %s. Right-click to open inventory.",
+  "item.wnir.wedding_ring.bound_to": "Bound to: %s",
+  "item.wnir.wedding_ring.unbound": "Shift+right-click your pet to bind.",
+  "item.wnir.wedding_ring.hint_shift": "Shift+right-click this pet to rebind the ring.",
+  "item.wnir.wedding_ring.no_slots": "%s is not bound to this ring.",
+  "item.wnir.wedding_ring.already_bound": "%s is already bound to this ring.",
+  "item.wnir.wedding_ring.pet_died": "Your bond was broken — %s has died.",
+
+  "gui.wnir.wedding_ring.slot.wolf_armor": "Body Armor",
+  "gui.wnir.wedding_ring.slot.wolf_armor.desc": "Wolf Armor made from armadillo scutes.",
+  "gui.wnir.wedding_ring.slot.saddle": "Saddle",
+  "gui.wnir.wedding_ring.slot.saddle.desc": "Required to ride. Place a saddle here.",
+  "gui.wnir.wedding_ring.slot.horse_armor": "Horse Armor",
+  "gui.wnir.wedding_ring.slot.horse_armor.desc": "Reduces damage taken. Iron, gold, or diamond.",
+  "gui.wnir.wedding_ring.slot.cargo": "Cargo",
+  "gui.wnir.wedding_ring.slot.cargo.desc": "Storage slot. Accessible via hoppers too.",
+  "gui.wnir.wedding_ring.slot.body": "Body Slot",
+  "gui.wnir.wedding_ring.slot.body.desc": "Body armor or accessory slot."
 }

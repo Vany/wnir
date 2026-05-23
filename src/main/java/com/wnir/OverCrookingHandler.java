@@ -30,7 +30,11 @@ public final class OverCrookingHandler {
     public static void onBlockDrops(BlockDropsEvent event) {
         if (!event.getState().is(BlockTags.LEAVES)) return;
 
-        int level = WnirEnchantments.getLevel(event.getTool(), KEY);
+        ItemStack tool = event.getTool();
+        int level = WnirEnchantments.getLevel(tool, KEY);
+        WnirMod.LOGGER.info("[OverCrooking] leaf break — tool={} enc_level={} drops={}",
+            tool.isEmpty() ? "EMPTY" : tool.getItem().getDescriptionId(),
+            level, event.getDrops().size());
         if (level <= 0) return;
 
         int mult = level + 1;
@@ -39,7 +43,9 @@ public final class OverCrookingHandler {
             ItemStack stack = entity.getItem();
             if (stack.is(Items.STICK)) continue;
             if (stack.is(ItemTags.SAPLINGS)) continue;
+            int before = stack.getCount();
             stack.setCount(Math.min(stack.getCount() * mult, stack.getMaxStackSize()));
+            WnirMod.LOGGER.info("[OverCrooking] multiplied {} x{}: {}→{}", stack.getItem().getDescriptionId(), mult, before, stack.getCount());
         }
     }
 }

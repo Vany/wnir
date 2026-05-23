@@ -13,12 +13,18 @@ import net.neoforged.neoforge.capabilities.Capabilities;
 import net.neoforged.neoforge.capabilities.RegisterCapabilitiesEvent;
 import net.neoforged.neoforge.common.NeoForge;
 import net.neoforged.neoforge.event.brewing.RegisterBrewingRecipesEvent;
+import net.neoforged.neoforge.event.entity.EntityJoinLevelEvent;
 import net.neoforged.neoforge.event.entity.living.FinalizeSpawnEvent;
+import net.neoforged.neoforge.event.entity.living.LivingDamageEvent;
+import net.neoforged.neoforge.event.entity.living.LivingIncomingDamageEvent;
 import net.neoforged.neoforge.event.level.BlockEvent;
 import net.neoforged.neoforge.event.level.LevelEvent;
 import net.neoforged.neoforge.event.server.ServerAboutToStartEvent;
 import net.neoforged.neoforge.event.server.ServerStartingEvent;
 import net.neoforged.neoforge.event.server.ServerStoppingEvent;
+import net.neoforged.neoforge.event.ServerChatEvent;
+import net.neoforged.neoforge.event.level.SleepFinishedTimeEvent;
+import net.neoforged.neoforge.event.tick.ServerTickEvent;
 import net.neoforged.neoforge.network.event.RegisterPayloadHandlersEvent;
 import net.neoforged.neoforge.transfer.item.VanillaContainerWrapper;
 import net.neoforged.neoforge.transfer.item.WorldlyContainerWrapper;
@@ -51,6 +57,18 @@ public class WnirMod {
         NeoForge.EVENT_BUS.addListener(ToughnessHandler::onPlayerTick);
         NeoForge.EVENT_BUS.addListener(OverCrookingHandler::onBlockDrops);
         NeoForge.EVENT_BUS.addListener(MouseyCompassItem::onPlayerTick);
+        NeoForge.EVENT_BUS.addListener(WeddingRingItem::onLivingDeath);
+        NeoForge.EVENT_BUS.addListener(WeddingRingTargetGoal::onMobTargetsPet);
+        NeoForge.EVENT_BUS.addListener(WeddingRingAttackHandler::onLivingHurt);
+        NeoForge.EVENT_BUS.<net.neoforged.neoforge.event.entity.living.LivingIncomingDamageEvent>addListener(WeddingRingAttackHandler::onLivingIncomingDamage);
+        NeoForge.EVENT_BUS.addListener(WeddingRingAttackHandler::onLivingExperienceDrop);
+        NeoForge.EVENT_BUS.addListener(WeddingRingAttackHandler::onLivingDrops);
+        NeoForge.EVENT_BUS.addListener(WeddingRingTickHandler::onServerTick);
+        NeoForge.EVENT_BUS.addListener(WeddingRingLlmHandler::onServerTick);
+        NeoForge.EVENT_BUS.addListener(WeddingRingLlmHandler::onServerStopping);
+        NeoForge.EVENT_BUS.addListener(this::onServerChat);
+        NeoForge.EVENT_BUS.addListener(this::onSleepFinished);
+        NeoForge.EVENT_BUS.addListener(this::onEntityJoinLevel);
         NeoForge.EVENT_BUS.addListener(WirelessFuelItem::onServerTickPre);
         NeoForge.EVENT_BUS.addListener(WirelessFuelItem::onServerTick);
         NeoForge.EVENT_BUS.addListener(WirelessFuelItem::onFurnaceFuelBurnTime);
@@ -76,7 +94,45 @@ public class WnirMod {
             .playToServer(
                 TraderPayloads.TraderActionPayload.TYPE,
                 TraderPayloads.TraderActionPayload.STREAM_CODEC,
-                TraderPayloads.TraderActionPayload::handle);
+                TraderPayloads.TraderActionPayload::handle)
+            .playToClient(
+                WeddingRingCaptionPayload.TYPE,
+                WeddingRingCaptionPayload.STREAM_CODEC,
+                WeddingRingCaptionPayload::handle)
+            .playToServer(
+                WeddingRingButtonPayload.TYPE,
+                WeddingRingButtonPayload.STREAM_CODEC,
+                WeddingRingButtonPayload::handle);
+    }
+
+    private void onEntityJoinLevel(EntityJoinLevelEvent event) {
+        if (!(event.getEntity() instanceof net.minecraft.world.entity.Mob mob)) return;
+        if (event.getLevel().isClientSide()) return;
+        WeddingRingData data = WeddingRingData.get(mob);
+        if (data == null) return;
+        // Re-apply goals and attributes after world load / pet-storage unstore
+        WeddingRingGoalManager.removeGoals(mob);
+        WeddingRingGoalManager.addGoals(mob);
+        WeddingRingAttributeManager.recalculate(mob);
+        WeddingRingLlmHandler.onPetJoin(mob);
+        // Re-anchor ring item if pet-storage gave the pet a new UUID
+        if (!(event.getLevel() instanceof net.minecraft.server.level.ServerLevel sl)) return;
+        net.minecraft.server.level.ServerPlayer owner =
+            sl.getServer().getPlayerList().getPlayer(data.getOwnerUUID());
+        if (owner == null) return;
+        for (int i = 0; i < owner.getInventory().getContainerSize(); i++) {
+            net.minecraft.world.item.ItemStack stack = owner.getInventory().getItem(i);
+            if (!(stack.getItem() instanceof WeddingRingItem)) continue;
+            net.minecraft.nbt.CompoundTag tag = WeddingRingItem.getOrCreate(stack);
+            java.util.UUID stored = WeddingRingItem.readUUID(tag);
+            if (stored == null || stored.equals(mob.getUUID())) continue; // already correct
+            if (sl.getEntity(stored) != null) continue; // old entity still alive — don't touch
+            // Old UUID gone, this pet has ring data for this owner → re-anchor
+            LOGGER.info("[WeddingRing] Re-anchoring ring: old={} new={} owner={}",
+                stored, mob.getUUID(), owner.getScoreboardName());
+            WeddingRingItem.reanchor(stack, mob);
+            break;
+        }
     }
 
     private void onRegisterCapabilities(RegisterCapabilitiesEvent event) {
@@ -176,6 +232,7 @@ public class WnirMod {
     private void onServerAboutToStart(ServerAboutToStartEvent event) {
         CelluloserConfig.load();
         BlockDeleteConfig.load();
+        WeddingRingLlmConfig.load();
     }
 
     // Re-force chunks whenever any dimension loads (handles lazy/custom dimensions too)
@@ -189,6 +246,19 @@ public class WnirMod {
         // Pre-load personal dimension manager so biome source map is populated before any player joins
         PersonalDimensionManager.get(event.getServer());
         // configs already loaded in onServerAboutToStart
+    }
+
+    private void onServerChat(ServerChatEvent event) {
+        net.minecraft.server.level.ServerPlayer player = event.getPlayer();
+        if (!(player.level() instanceof ServerLevel sl)) return;
+        WeddingRingLlmHandler.onServerChat(
+            sl.getServer(), player.getScoreboardName(),
+            event.getMessage().getString());
+    }
+
+    private void onSleepFinished(SleepFinishedTimeEvent event) {
+        if (!(event.getLevel() instanceof net.minecraft.server.level.ServerLevel sl)) return;
+        WeddingRingLlmHandler.onSleepFinished(sl.getServer());
     }
 
     private void onServerStopping(ServerStoppingEvent event) {

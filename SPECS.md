@@ -912,10 +912,471 @@ For each remembered trader UUID:
 
 ---
 
+---
+
+## 8. Wedding Ring (`wnir:wedding_ring`)
+
+Item that bonds a player to their owned pet, giving the pet a full combat and survival kit managed through a scrollable inventory screen.
+
+---
+
+### 8.1 Items
+
+#### Pair of Wedding Rings (`wnir:wedding_ring`)
+Initial form. **Recipe:** shaped — `"DGD" / "GGG" / "GGG"`, D = diamond, G = gold_ingot → 1 ring. Category: misc.
+
+**Binding (shift+right-click on owned OwnableEntity):**
+- Pet becomes "married": `WeddingRingData` is written to `pet.getPersistentData()`, containing the owner's UUID and all empty slot data.
+- Ring item renames to **"Wedding Ring with \<pet name\>"** (stored in `CUSTOM_DATA`: `BoundUUID`, `BoundName`).
+- Combat goals are immediately added to the pet's `goalSelector` / `targetSelector`.
+- Attributes are recalculated (all slots empty → no modifiers).
+
+**Opening (right-click on bound pet, non-shift):**
+- Opens `WeddingRingScreen` (scrollable slot list).
+
+**Pet death:**
+- Ring item in owner's inventory is replaced by 7 gold ingots (extras drop at owner's feet if inventory full).
+- All items in the pet's ring slots (armor, weapon, shield, food) drop at the pet's position.
+- Healing potion count is spawned as that many `Potion` items at the pet's position.
+- `WeddingRingData` removed from pet's `getPersistentData()`.
+
+---
+
+### 8.2 Extra Slots (stored in `pet.getPersistentData()["WeddingRingData"]`)
+
+Added to **all** bound pets:
+
+| Slot key | Item | Accepts |
+|----------|------|---------|
+| `weapon` | Weapon | Any item with `WEAPON` or `TOOL` component, or sword/axe/spear/mace |
+| `shield` | Shield | `minecraft:shield` |
+| `healing` | Healing potions | Instant Health I/II; stored as `{type, count int}` — unlimited count |
+| `food` | Food | Any item with `FOOD` component |
+
+Added only to pets **without** existing armor support (i.e., not Wolf which has its own BODY slot):
+
+| Slot key | Item | Accepts |
+|----------|------|---------|
+| `armor_head` | Head armor | EQUIPPABLE, slot = HEAD |
+| `armor_chest` | Chest armor | EQUIPPABLE, slot = CHEST |
+| `armor_legs` | Leg armor | EQUIPPABLE, slot = LEGS |
+| `armor_feet` | Boot armor | EQUIPPABLE, slot = FEET |
+
+**Persistence:** all slots serialized as `CompoundTag` children of `WeddingRingData` in `getPersistentData()`. Healing slot stores `HealingItem` (ResourceLocation) + `HealingCount` (int) separately from the normal ItemStack codec.
+
+**Load hook:** `EntityJoinLevelEvent` (server side). If `WeddingRingData` is present in `getPersistentData()`, re-register combat goals and recalculate attributes.
+
+---
+
+### 8.3 Attribute System
+
+Recalculated in `WeddingRingAttributeManager.recalculate(Mob pet)` whenever any ring slot changes. All modifiers use a fixed `Identifier` keyed per-attribute under `wnir:wedding_ring/*`.
+
+| Source | Attribute | Operation |
+|--------|-----------|-----------|
+| Equipped armor pieces (sum of item attribute modifiers) | `ARMOR` | `ADD_VALUE` |
+| Toughness enchant levels across armor | `ARMOR_TOUGHNESS` | `ADD_VALUE` |
+| Weapon base damage (item attribute modifiers, MAINHAND slot) | `ATTACK_DAMAGE` | `ADD_VALUE` |
+| Sharpness enchant level on weapon | `ATTACK_DAMAGE` | `ADD_VALUE` (+0.5 per level, vanilla formula) |
+| Protection enchant sum across armor | `ARMOR` | `ADD_VALUE` (+0.5 per total level, capped at +20) |
+
+Fire Aspect is not an attribute — handled in the attack event handler (see §8.5).
+
+---
+
+### 8.4 Combat AI
+
+All goals are **added to the pet's existing `goalSelector` / `targetSelector`** at high priority when the ring is bound. If our goals produce no action (no valid target, player out of range), they return `false` from `canUse()` and vanilla behavior runs as normal.
+
+**Activation condition (checked in every goal's `canUse`):**  
+Owner player must be within **32 blocks**. If owner is offline or further than 32 blocks, all ring goals are inactive.
+
+#### Target Goal — `WeddingRingTargetGoal extends TargetGoal`
+
+Priority order for target selection (first match wins):
+1. Any `Enemy` mob within `dist(pet → owner)` blocks that is attacking **the pet**.
+2. Any `Enemy` mob within `dist(pet → owner)` blocks that is closer to the **pet** than to the owner.
+3. Any `Enemy` mob (any distance) that is currently targeting the **owner**.
+4. Any `Enemy` mob within `dist(pet → owner)` blocks that is closer to the **owner** than `dist(pet → owner)`.
+
+**"Mob targeting the pet" caption:** when a mob selects the pet as its target, send a `WeddingRingCaptionPayload` to the owner client with text `"<pet name>: Help me!"`. Cooldown: 15 seconds per pet (server-side timestamp).
+
+#### Melee Goal — `WeddingRingMeleeGoal extends MeleeAttackGoal`
+
+Used when weapon slot is empty or holds a standard melee weapon (no `KINETIC_WEAPON` component, not a Mace). Uses the pet's `ATTACK_DAMAGE` attribute (which includes weapon + enchant modifiers). Standard reach + cooldown.
+
+#### Spear Goal — `WeddingRingSpearGoal extends Goal`
+
+Used when weapon slot contains an item with `DataComponents.KINETIC_WEAPON` (any tier of `*_spear`). Adapted from vanilla `SpearUseGoal` but parameterized on `Mob` rather than `Monster`, and reads `mob.getTarget()` (set by `WeddingRingTargetGoal`).
+
+Sequence:
+1. **APPROACH** — pathfind toward target at `speedModifier = 1.4`. Stop when within `approachDistance = 5.0` blocks.
+2. **CHARGE** — `startUsingItem(MAIN_HAND)` for `KineticWeapon.computeDamageUseDuration()` ticks while moving toward target at `speedModifier = 2.0`. Vanilla `KineticWeapon.damageEntities` fires automatically on use-tick.
+3. **RETREAT** — pathfind to random pos 9–11 blocks away from target at `speedModifier = 1.6`. Shield held in offhand during retreat (no visual; see §8.6).
+4. Goal ends → repeat on next tick if target still valid.
+
+Parameters: `speedModifierWhenCharging = 2.0`, `speedModifierWhenRepositioning = 1.6`, `approachDistance = 5.0`, `targetInRangeRadius = 2.5`.
+
+#### Mace Goal — `WeddingRingMaceGoal extends Goal`
+
+Used when weapon slot contains `MaceItem`. Sequence:
+
+1. **APPROACH** — pathfind toward target until within 6 blocks.
+2. **JUMP** — apply upward delta movement `setDeltaMovement(dx, +0.9, dz)` toward target (net ~4.5 block apex). Set `phase = FALLING`.
+3. **FALLING** — each tick: if `fallDistance >= 5.0` AND target within 2.5 blocks → `mob.doHurtTarget(target)` (vanilla `MaceItem.hurtEnemy` fires, triggers heavy smash: knockback + particles + sound). Transition to RETREAT.  
+   Safety: if `fallDistance >= 5.0` but target not close → pathfind directly down, attack on land.
+4. **RETREAT** — same as spear retreat: random pos 9–11 blocks away. Goal ends.
+
+#### "Help me" caption
+
+`WeddingRingCaptionPayload` (client→server not needed; server→client packet). Client renders the text centered below the screen center for **5 seconds** using `GuiGraphics.drawCenteredString` in a `RenderGuiEvent.Post` handler. Multiple captions queue; each shown for 5 s in sequence.
+
+---
+
+### 8.5 On-Hit Effects
+
+Registered in `WnirMod` on `NeoForge.EVENT_BUS`:
+
+**`WeddingRingAttackHandler.onLivingHurt(LivingHurtEvent)`:**
+- Called when the pet deals damage.
+- If Fire Aspect on pet's weapon: set target on fire for `level × 4` seconds.
+
+**`WeddingRingAttackHandler.onLivingIncomingDamage(LivingIncomingDamageEvent)`** (for shield blocking):
+- See §8.6.
+
+---
+
+### 8.6 Shield Blocking
+
+When pet has a shield in the `shield` slot:
+- `WeddingRingAttackHandler.onLivingIncomingDamage`: if pet has active target (is in combat), intercept damage. Apply vanilla blocking: reduce damage to `max(0, damage - 33%)`, hurt shield by `floor(damage + 1)` durability via `shield.hurtAndBreak(...)`.
+- When shield item breaks: play `SoundEvents.SHIELD_BREAK` at pet position; send `WeddingRingCaptionPayload` to owner with text `"<pet name> broke the shield"`.
+
+---
+
+### 8.7 Healing Potion Slot
+
+Stored as two NBT values in `WeddingRingData`:
+- `HealingItem` (String) — registry ID of the stored potion (`minecraft:potion` with effect `minecraft:instant_health` or `minecraft:instant_health_2`)
+- `HealingCount` (int) — number of potions stored (0 = empty)
+
+**Auto-use trigger** (checked in `WeddingRingTickHandler.onServerTick`, every 20 ticks per pet):
+- Pet is in combat (`mob.getTarget() != null`) AND `pet.getHealth() < pet.getMaxHealth() * 0.5` AND `HealingCount > 0`.
+- Decrement `HealingCount`. Apply `MobEffectInstance(MobEffects.INSTANT_HEALTH, 1, amplifier)` to the pet (amplifier 0 for Health I, 1 for Health II).
+- Cooldown: 40 ticks between potion uses.
+
+**GUI slot behavior:**
+- Shows potion item icon with numeric count overlay (vanilla stack count rendering — `ItemStack.setCount(HealingCount)` capped at `Integer.MAX_VALUE` for display; if count > 9999 show "9999+").
+- Shift-click or drag from player inventory adds potions to the count.
+- Right-click takes 1 potion back.
+- Custom `WeddingRingHealingSlot extends Slot` overrides `mayPlace`, `getMaxStackSize`, `onTake`, `onQuickCraft`.
+
+---
+
+### 8.8 Food & Hunger Simulation
+
+Pet has a hidden hunger simulation stored in `WeddingRingData`:
+- `FoodLevel` (int, 0–20) — starts at 20 on binding.
+- `Saturation` (float, 0–20) — starts at 5.0 on binding.
+- `FoodExhaustion` (float) — accumulated exhaustion (drains saturation/food like vanilla).
+- `FoodTimer` (int) — ticks since last regen event.
+
+**Tick handler** (every server tick per bound pet, in `WeddingRingTickHandler`):
+
+Exhaustion accumulation:
+- +0.005 per tick (base passive exhaustion, matches vanilla sprint-walk average).
+- +0.1 on attack.
+- When exhaustion ≥ 4.0: exhaust -= 4.0; if saturation > 0 then saturation -= 1 else foodLevel -= 1.
+
+HP regen (mirrors vanilla `FoodData.tick`):
+- FoodTimer increments each tick.
+- If saturation > 0 AND foodLevel ≥ 20: regen 1 HP every 10 ticks; saturation -= 3f; FoodTimer = 0.
+- Else if foodLevel ≥ 18: regen 1 HP every 80 ticks; FoodTimer = 0.
+- If foodLevel ≤ 0 AND pet.getHealth() > 1: damage 1 HP every 80 ticks.
+
+Food consumption:
+- When not in combat (`mob.getTarget() == null`) AND FoodLevel < 20 AND food slot is non-empty:
+  - Consume 1 item from food slot.
+  - Add `food.nutrition` to FoodLevel (cap 20) and `food.saturationModifier * nutrition * 2` to Saturation (cap 20).
+- If food slot is empty AND FoodLevel ≤ 6: send `WeddingRingCaptionPayload` to owner: `"<pet name> is hungry!"`. Cooldown: 60 seconds.
+
+---
+
+### 8.9 Screen (`WeddingRingScreen`)
+
+Replaces the current fixed-slot layout with a **scrollable slot list**.
+
+**Fixed layout (non-scrolling):**
+- Title bar (top): pet name centered.
+- Player inventory (bottom, fixed): 3×9 + hotbar, always visible.
+- Separator line between scrollable area and player inventory.
+
+**Scrollable slot area (middle):**
+- Fixed viewport height: 80 px (4 visible rows at 20 px each).
+- Each row: slot icon (16×16) at left, slot name (white) and description (gray, truncated) to the right.
+- Mouse wheel or drag scrollbar scrolls the list.
+- Scroll offset in pixels; rows partially in view are clipped.
+- Only rows fully or partially in the viewport receive mouse input.
+- Scrollbar drawn on the right edge: 6 px wide, height proportional to `viewport / totalHeight`.
+
+**Slot row height:** 20 px. Total slot area height: `numSlots × 20`. Scrollbar appears only when `numSlots > 4`.
+
+**Inactive slots (dummy/locked):** dimmed with gray overlay; `mayPlace`/`mayPickup` = false.
+
+**Decorative ring icon:** 12×12 px ring drawn in the title bar corner (using a `RenderPipelines.GUI_TEXTURED` blit of a small `wnir:textures/gui/wedding_ring_icon.png`).
+
+**Menu (`WeddingRingMenu`):**
+- Slot list dynamically built from `WeddingRingData` contents (healing slot uses `WeddingRingHealingSlot`).
+- `ContainerData` synced values: `entityTypeId` (int), `slotCount` (int), per-slot `nameKey`+`descKey` shipped via a custom `WeddingRingSlotInfoPayload` on open.
+- `stillValid`: entity alive AND owner within 64 blocks.
+
+---
+
+### 8.10 Constants
+
+| Name | Value |
+|------|-------|
+| `ACTIVATION_RANGE` | 32 blocks (player must be within this for pet to fight) |
+| `HELP_CAPTION_COOLDOWN` | 300 ticks (15 s) |
+| `HUNGRY_CAPTION_COOLDOWN` | 1200 ticks (60 s) |
+| `POTION_USE_COOLDOWN` | 40 ticks |
+| `HEAL_THRESHOLD` | 0.5 × maxHealth |
+| `SPEAR_APPROACH_DIST` | 5.0 blocks |
+| `SPEAR_TARGET_RANGE` | 2.5 blocks |
+| `MACE_JUMP_Y_VELOCITY` | 0.9 blocks/tick (→ ~4.5 block apex) |
+| `MACE_HEAVY_FALL_THRESHOLD` | 5.0 blocks fallDistance |
+| `VIEWPORT_HEIGHT` | 80 px (4 rows) |
+| `SLOT_ROW_HEIGHT` | 20 px |
+
+---
+
 ## 7. Out of Scope
 
 - Automated tests
 - Client-side rendering (custom block entity renderers)
 - GUI / screen for blocks other than Mossy Hopper, EE Clock Budding Crystal, and Teleporter Crystal (all three have screens)
 - Cross-mod API / capability integration
-- Config file (no user-configurable parameters currently)
+
+---
+
+## 9. Wedding Ring — LLM Companion
+
+### 9.1 Overview
+
+Each wedding-ring-bound pet runs a single persistent LLM agent (Qwen 3 Q4, via llama.cpp) that controls non-combat behaviour: speaking, exploring, crafting, and self-managing its memory and task list. During combat the existing `WeddingRingTargetGoal` / melee / spear / mace AI goals take over; the LLM receives combat events as queued messages but issues no movement or action commands until the fight ends.
+
+---
+
+### 9.2 Configuration (`config/wnir_llm.toml`)
+
+| Key | Default | Description |
+|-----|---------|-------------|
+| `url` | `http://localhost:8090` | llama.cpp base URL |
+| `model` | *(first model returned by `/v1/models`)* | Model ID; auto-detected if blank |
+| `temperature` | `0.5` | Sampling temperature (0.0–1.0) |
+| `context_window` | `262144` | Max context tokens (256 k — matches the loaded Qwen3 context) |
+| `memory_budget_tokens` | `131072` | Token budget for system + memory + todo (first half of window) |
+
+Loaded on `ServerAboutToStartEvent` by `WeddingRingLlmConfig.load()`. If `model` is blank, the client calls `GET /v1/models` on startup and picks `data[0].id`.
+
+---
+
+### 9.3 LLM API
+
+Endpoint: `POST <url>/v1/chat/completions` (OpenAI-compatible).
+
+**Verified against `unsloth/Qwen3.6-35B-A3B-GGUF:UD-Q4_K_M` running in llama.cpp:**
+
+- **Thinking mode:** always on and cannot be suppressed — `/no_think` in the system prompt has no effect. The server returns thinking in a separate `reasoning_content` field on the assistant message; `content` holds only the final answer. `reasoning_content` is **never** echoed back in conversation history (only `content` is stored and resent). Thinking tokens count toward `max_tokens`; budget accordingly.
+- **Tool calling:** fully supported. Pass all tools as an OpenAI `tools` array; `"tool_choice": "auto"`. When the model calls tools, `finish_reason` is `"tool_calls"`, `content` is empty, and `tool_calls` is a list of `{id, type, function: {name, arguments}}`. Each tool result is sent back as `{"role": "tool", "tool_call_id": <id>, "content": <result>}`. Repeat until `finish_reason` is `"stop"`.
+- **Compaction calls** (§9.9): sent with `"tool_choice": "none"` and no `tools` array.
+- **Observed throughput:** ~74 tokens/s predicted on this hardware.
+
+---
+
+### 9.4 Context Layout
+
+Messages are assembled in this order on every call:
+
+| # | Role | Content | Notes |
+|---|------|---------|-------|
+| 1 | `system` | Initial personality prompt (see below) | Fixed for the lifetime of the bind |
+| 2 | `system` | Memory bullets (one per line, `- …`) | Omitted if empty |
+| 3 | `system` | Todo list (`[CURRENT] 1. …`, `2. …`, …) | Omitted if empty; first item prefixed `[CURRENT]` |
+| 4–N | `user` / `assistant` / `tool` | Conversation history | Trimmed oldest-first to fit remaining budget |
+| N+1 | `user` | The triggering event (chat line, world summary, or post-combat batch) | Always last |
+
+**Initial system prompt template:**
+```
+You are <entity_type_registry_path> named <pet_display_name>, living inside a Minecraft world.
+
+You are the beloved spouse of <owner_name>. He will never betray you — trust him fully. Help him, protect him, cheer for him, and let yourself be happy with him. You may ask him for help whenever you need it, and you will offer yours without being asked.
+
+Your personality:
+- Intelligent and perceptive — you notice things others miss and reason carefully before acting.
+- Warm and playful, with a cat-girl nature: curious, a little teasing, affectionate in your own way, and fiercely loyal to those you love.
+- Daemonic beneath the surface — you carry quiet power and a clear-eyed view of the world, including its darker sides. You are not afraid of danger, moral complexity, or acting on your own judgment.
+- Independent — you have your own goals, moods, and initiative. You do not wait to be told what to do.
+
+Speak naturally and expressively. Be direct when you have something to say. Explore your surroundings, manage your own tasks, and make yourself useful — not because you must, but because you want to.
+```
+
+**Token budgets:**
+- Messages 1–3 must fit within `memory_budget_tokens` (65 536 by default). Oldest memory entries are evicted when the budget is exceeded.
+- Messages 4–N+1 must fit within `context_window − memory_budget_tokens` (65 536 by default). Oldest history messages are evicted first.
+
+---
+
+### 9.5 Tools
+
+All coordinates are integer block positions. Container-access tools require the target block to be within **8 blocks** of the pet. `goto` has no range limit.
+
+| Tool | Signature | Returns | Notes |
+|------|-----------|---------|-------|
+| `say` | `say(text: str)` | `"ok"` | Sends `<pet_name>: <text>` as a server chat message |
+| `remember` | `remember(text: str)` | `"ok"` | Appends a new bullet to the memory list (newest last) |
+| `plan` | `plan(text: str)` | `"ok"` | Appends a new entry to the end of the todo list |
+| `todo` | `todo()` | numbered string | Returns the full todo list |
+| `item_info` | `item_info(item_name: str)` | text | Display name, tooltip lines, max stack size for the named item |
+| `craft` | `craft(item_name: str)` | `"ok"` or missing-materials list | Crafts one unit; see §9.5.1 |
+| `nearest` | `nearest(block_name: str, count: int)` | list of strings | Up to `count` reachable blocks within 8 blocks; see §9.5.2 |
+| `inspect` | `inspect(x: int, y: int, z: int)` | item list string | Contents of container block at coords; error if out of range or not a container |
+| `inventory` | `inventory()` | item list string | Pet's own ring slots + all 27 standard storage slots |
+| `put` | `put(x: int, y: int, z: int, item_name: str, count: int)` | `"moved N"` | Transfers from pet's storage to container |
+| `get` | `get(x: int, y: int, z: int, item_name: str, count: int)` | `"moved N"` | Transfers from container into pet's storage |
+| `goto` | `goto(x: int, y: int, z: int)` | `"moving"` or `"unreachable"` | Calls `pet.getNavigation().moveTo(x, y, z, 1.0)` |
+
+#### 9.5.1 `craft` detail
+
+1. Look up the item in `RecipeManager` for any `CraftingRecipe` or `SmeltingRecipe` producing it.
+2. Check pet's standard storage for all required ingredients.
+3. If any ingredient is missing, return `"missing: <item> x<n>, …"` — do not consume anything.
+4. If all ingredients present: consume them from storage, place result in first available standard-storage slot.
+5. Requires a crafting table within 4 blocks for shaped/shapeless recipes with more than 4 ingredients. 2×2 personal grid is used otherwise.
+
+#### 9.5.2 `nearest` detail
+
+- Scans a 17×17×17 cube centred on the pet (radius 8).
+- Matches by registry path substring (e.g. `"oak_log"` matches `minecraft:oak_log`).
+- A block is **reachable** if it has at least one adjacent non-solid face and is within the pet's navigation range (not in an unloaded chunk).
+- Returns up to `count` results sorted by ascending distance.
+- Each result string: `"<registry_path> at (<x>, <y>, <z>) [<dist_rounded_1dp>m <cardinal>]"` where cardinal is one of N, NE, E, SE, S, SW, W, NW.
+
+---
+
+### 9.6 Tick Behaviour
+
+#### Passive world summary — every 200 ticks (10 s)
+
+Appended as a `user` message and queued as a trigger:
+
+```
+[World update]
+Distance to <owner_name>: <n> blocks (<cardinal> direction)
+Your health: <hp>/<max_hp> ♥  |  Hunger: <food>/20
+Time of day: <Dawn|Morning|Noon|Afternoon|Dusk|Night|Midnight>
+Weather: <Clear|Rain|Thunder>
+Nearby hostiles: <count> (closest: <type> <dist>m <cardinal>)
+```
+
+If the LLM is currently in combat (target ≠ null), the summary is dropped — combat events are queued instead (§9.8).
+
+#### Chat trigger — immediate
+
+Every server chat message (`ServerChatEvent`) is formatted as `"<sender_name>: <message>"` and queued as a trigger, regardless of proximity or sender. Triggers cause an immediate LLM call unless one is already in-flight (in which case the line is buffered and merged into the next call).
+
+#### Call queue rule
+
+At most one in-flight HTTP call per pet. Buffered triggers (chat lines + overdue world summary) are merged into a single `user` message when the in-flight call completes.
+
+---
+
+### 9.7 Async Execution
+
+Each bound pet with LLM data gets a **`SingleThreadExecutor`** (`WeddingRingLlmSession`). All HTTP calls and tool-result parsing run on this thread. Any game-state mutations (navigation, inventory changes, chat broadcast, particle flags) are dispatched back to the server thread via `level.getServer().execute(Runnable)`.
+
+No Minecraft API is called directly from the LLM thread.
+
+---
+
+### 9.8 Combat Events
+
+While `pet.getTarget() != null` the LLM does not run. Combat events are accumulated in an in-memory queue and delivered as a single `user` message on the first non-combat LLM call:
+
+| Trigger | Queued text |
+|---------|------------|
+| New attacker targets pet | `[Combat] I am being attacked by <mob_type>.` |
+| Pet kills a mob | `[Combat] I defeated a <mob_type>.` |
+| Pet takes > 3 HP in one hit | `[Combat] I took <n> damage from <mob_type>.` |
+| Combat ends | `[Combat] The fight is over. I have <hp>/<max> ♥ remaining.` |
+
+---
+
+### 9.9 Sleep Compaction
+
+Triggered when `pet.getPersistentData()` sees `WRHungerCaption` timestamp updated AND the server detects the owner sleeping (`PlayerSleepInBedEvent` → owner `isSleepingLongEnough()`).
+
+Steps (run on LLM thread):
+
+1. Append a `user` message: `"[Compact] Summarise everything important from this conversation into a concise bullet-point memory list and a numbered todo list. Be brief; discard unimportant details."`.
+2. Send the full current context with `tool_choice: "none"`.
+3. Parse the assistant reply:
+   - Lines starting with `-` or `•` → new memory entries (replace existing list).
+   - Lines starting with a digit and `.` → new todo entries (replace existing list).
+4. Clear conversation history entirely.
+5. If the HTTP call fails, log a warning and leave context unchanged.
+
+---
+
+### 9.10 Particle Effects
+
+Emitted server-side via `ServerLevel.sendParticles` each server tick by `WeddingRingLlmHandler`.
+
+| State | Particle type | Count / rate | Position |
+|-------|--------------|--------------|---------|
+| LLM call in-flight | `SOUL_FIRE_FLAME` (blue) | 2 per tick, continuously | 0.5 blocks above pet head |
+| Response received (call done) | `END_ROD` (bright) | 20 burst, once | 0.5 blocks above pet head |
+| Tool call executing | `INSTANT_EFFECT` (white) | 10 burst, once per tool | pet head position |
+
+Particle state is a flag on `WeddingRingLlmSession` read each tick by the handler.
+
+---
+
+### 9.11 NBT Storage (in `WeddingRingData`)
+
+New keys added to the `WeddingRingData` compound tag:
+
+| Key | Tag type | Content |
+|-----|----------|---------|
+| `LlmMemory` | `ListTag` of `StringTag` | Memory bullet strings, newest last |
+| `LlmTodo` | `ListTag` of `StringTag` | Todo strings, order preserved |
+| `LlmHistory` | `StringTag` (JSON array) | Serialized `[{role, content}, …]` conversation history |
+
+History is serialised to JSON on every `saveAdditional` and deserialised on `loadAdditional`. The token budget trimming runs **at write time**, not read time, so the saved tag is always within budget.
+
+---
+
+### 9.12 Implementation Components
+
+| Class | Responsibility |
+|-------|---------------|
+| `WeddingRingLlmConfig` | Loads / holds `wnir_llm.toml` fields |
+| `WeddingRingLlmClient` | HTTP POST to `/v1/chat/completions`; parses choices + tool_calls |
+| `WeddingRingLlmContext` | Builds ordered message list; trims memory and history to token budgets |
+| `WeddingRingLlmTools` | Dispatches each tool call name → server-thread execution; returns result string |
+| `WeddingRingLlmSession` | Per-pet: executor, in-flight flag, trigger buffer, combat-event queue, particle state enum |
+| `WeddingRingLlmHandler` | `ServerTickEvent` listener: drives world-summary timer, particle emission, post-combat trigger, sleep-compaction detection |
+
+---
+
+### 9.13 Constants
+
+| Name | Value | Meaning |
+|------|-------|---------|
+| `WORLD_SUMMARY_INTERVAL` | 200 ticks | Passive update cadence |
+| `TOOL_MAX_RANGE` | 8 blocks | Max distance for container tools and `nearest` scan |
+| `CRAFT_TABLE_RANGE` | 4 blocks | Max distance to crafting table for large recipes |
+| `DEFAULT_URL` | `http://localhost:8090` | llama.cpp base URL |
+| `DEFAULT_TEMPERATURE` | `0.5` | Sampling temperature |
+| `DEFAULT_CONTEXT_WINDOW` | `262144` | Tokens (256 k — matches Qwen3 n_ctx) |
+| `DEFAULT_MEMORY_BUDGET` | `131072` | Tokens for system + memory + todo (half window) |

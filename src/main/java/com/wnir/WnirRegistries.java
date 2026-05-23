@@ -515,6 +515,15 @@ public final class WnirRegistries {
             )
         );
 
+    public static final Supplier<WeddingRingItem> WEDDING_RING_ITEM =
+        ITEMS.register("wedding_ring", () ->
+            new WeddingRingItem(
+                new Item.Properties()
+                    .stacksTo(1)
+                    .setId(ResourceKey.create(Registries.ITEM, id("wedding_ring")))
+            )
+        );
+
     // ── Public accessors ─────────────────────────────────────────────────
 
     public static final Supplier<MenuType<WnirHopperMenu>> MOSSY_HOPPER_MENU =
@@ -543,6 +552,9 @@ public final class WnirRegistries {
 
     public static final Supplier<MenuType<TraderMenu>> TRADER_MENU =
         MENU_TYPES.register("trader", () -> new MenuType<>(TraderMenu::new, FeatureFlags.VANILLA_SET));
+
+    public static final Supplier<MenuType<WeddingRingMenu>> WEDDING_RING_MENU =
+        MENU_TYPES.register("wedding_ring", () -> new MenuType<>(WeddingRingMenu::clientSide, FeatureFlags.VANILLA_SET));
 
     public static final Supplier<BlockEntityType<MossyHopperBlockEntity>> MOSSY_HOPPER_BE = MOSSY_HOPPER.entity;
     public static final Supplier<BlockItem> MOSSY_HOPPER_ITEM = MOSSY_HOPPER.item;
@@ -676,6 +688,7 @@ public final class WnirRegistries {
                     output.accept(OPAQUE_TANK_ITEM.get());
                     output.accept(SPAWNER_ITEM.get());
                     output.accept(TRADER_ITEM.get());
+                    output.accept(WEDDING_RING_ITEM.get());
                 })
                 .build()
         );
