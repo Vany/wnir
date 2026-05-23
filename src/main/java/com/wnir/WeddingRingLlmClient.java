@@ -84,14 +84,23 @@ public final class WeddingRingLlmClient {
             body.addProperty("tool_choice", "none");
         }
 
+        String requestJson = GSON.toJson(body);
+        WnirMod.LOGGER.info("[LlmClient] → POST /v1/chat/completions | model={} msgs={} maxTok={}",
+            model, messages.size(), body.get("max_tokens").getAsInt());
+        WnirMod.LOGGER.info("[LlmClient] request: {}",
+            requestJson.length() > 1000 ? requestJson.substring(0, 1000) + "…" : requestJson);
+
         try {
             HttpRequest req = HttpRequest.newBuilder()
                 .uri(URI.create(WeddingRingLlmConfig.url + "/v1/chat/completions"))
                 .header("Content-Type", "application/json")
-                .POST(HttpRequest.BodyPublishers.ofString(GSON.toJson(body)))
+                .POST(HttpRequest.BodyPublishers.ofString(requestJson))
                 .timeout(Duration.ofSeconds(120))
                 .build();
             HttpResponse<String> resp = HTTP.send(req, HttpResponse.BodyHandlers.ofString());
+            WnirMod.LOGGER.info("[LlmClient] ← {} | {}",
+                resp.statusCode(),
+                resp.body().length() > 3000 ? resp.body().substring(0, 3000) + "…" : resp.body());
             return parseResponse(resp.body());
         } catch (Exception e) {
             WnirMod.LOGGER.error("[LlmClient] HTTP error: {}", e.getMessage());

@@ -6,7 +6,6 @@ import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.entity.Mob;
 import net.minecraft.world.phys.Vec3;
-import net.neoforged.neoforge.event.entity.living.LivingChangeTargetEvent;
 import net.neoforged.neoforge.event.server.ServerStoppingEvent;
 import net.neoforged.neoforge.event.tick.ServerTickEvent;
 
@@ -15,9 +14,9 @@ import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * Drives the per-pet LLM sessions each server tick:
- * - World summary every 200 ticks
  * - Particle effects based on session state
  * - Combat-end detection to flush queued combat events
+ * - World summary every 200 ticks
  * - Sleep compaction trigger
  * - Session lifecycle (create on entity join, remove on death/server stop)
  */
@@ -25,28 +24,28 @@ public final class WeddingRingLlmHandler {
 
     private static final int WORLD_SUMMARY_INTERVAL = 200;
 
-    /** session UUID → tick counter for world summary. Accessed only from server tick. */
-    private static final ConcurrentHashMap<UUID, WeddingRingLlmSession> SESSIONS   = new ConcurrentHashMap<>();
-    private static final ConcurrentHashMap<UUID, Integer> SUMMARY_TIMERS            = new ConcurrentHashMap<>();
-    /** Tracks whether each pet was in combat last tick (for end-of-combat detection). */
-    private static final ConcurrentHashMap<UUID, Boolean> WAS_IN_COMBAT             = new ConcurrentHashMap<>();
+    private static final ConcurrentHashMap<UUID, WeddingRingLlmSession> SESSIONS = new ConcurrentHashMap<>();
+    private static final ConcurrentHashMap<UUID, Integer> SUMMARY_TIMERS         = new ConcurrentHashMap<>();
+    private static final ConcurrentHashMap<UUID, Boolean> WAS_IN_COMBAT          = new ConcurrentHashMap<>();
 
     private WeddingRingLlmHandler() {}
 
     // ── Session lifecycle ────────────────────────────────────────────────────
 
-    /** Called from WnirMod.onEntityJoinLevel — creates a session if the pet is LLM-enabled. */
     public static void onPetJoin(Mob pet) {
         WeddingRingData data = WeddingRingData.get(pet);
         if (data == null) return;
         UUID uid = pet.getUUID();
-        SESSIONS.computeIfAbsent(uid, WeddingRingLlmSession::new);
+        boolean created = SESSIONS.putIfAbsent(uid, new WeddingRingLlmSession(uid)) == null;
+        if (created) WnirMod.LOGGER.info("[LlmHandler] session created for pet {}", uid);
     }
 
-    /** Called from WeddingRingTickHandler.onPetDeath. */
     public static void onPetDeath(UUID petUUID) {
         WeddingRingLlmSession session = SESSIONS.remove(petUUID);
-        if (session != null) session.shutdown();
+        if (session != null) {
+            session.shutdown();
+            WnirMod.LOGGER.info("[LlmHandler] session removed for pet {}", petUUID);
+        }
         SUMMARY_TIMERS.remove(petUUID);
         WAS_IN_COMBAT.remove(petUUID);
     }
@@ -62,19 +61,19 @@ public final class WeddingRingLlmHandler {
 
     public static void onServerTick(ServerTickEvent.Post event) {
         MinecraftServer server = event.getServer();
-        for (ServerLevel level : server.getAllLevels()) {
-            level.getEntities().getAll().forEach(entity -> {
-                if (!(entity instanceof Mob mob) || !mob.isAlive()) return;
-                WeddingRingData data = WeddingRingData.get(mob);
-                if (data == null) return;
+        for (var entry : SESSIONS.entrySet()) {
+            UUID uid     = entry.getKey();
+            WeddingRingLlmSession session = entry.getValue();
+            Mob mob = findPet(server, uid);
+            if (mob == null) continue;
 
-                UUID uid = mob.getUUID();
-                WeddingRingLlmSession session = SESSIONS.computeIfAbsent(uid, WeddingRingLlmSession::new);
+            WeddingRingData data = WeddingRingData.get(mob);
+            if (data == null) continue;
 
-                tickParticles(session, mob, level);
-                tickCombatTracking(session, server, mob, uid);
-                tickWorldSummary(session, server, mob, data, uid, level);
-            });
+            ServerLevel level = (ServerLevel) mob.level();
+            tickParticles(session, mob, level);
+            tickCombatTracking(session, server, mob, uid, data);
+            tickWorldSummary(session, server, mob, data, uid, level);
         }
     }
 
@@ -109,24 +108,20 @@ public final class WeddingRingLlmHandler {
     }
 
     private static void tickCombatTracking(WeddingRingLlmSession session, MinecraftServer server,
-                                            Mob pet, UUID uid) {
-        boolean inCombat = pet.getTarget() != null;
+                                            Mob pet, UUID uid, WeddingRingData data) {
+        boolean inCombat    = pet.getTarget() != null;
         boolean wasInCombat = WAS_IN_COMBAT.getOrDefault(uid, false);
         WAS_IN_COMBAT.put(uid, inCombat);
 
-        // Combat just ended → flush combat events (only if AI enabled)
-        if (wasInCombat && !inCombat) {
-            WeddingRingData data = WeddingRingData.get(pet);
-            if (data != null && data.isAiEnabled()) {
-                session.flushCombatEvents(server, pet);
-            }
+        if (wasInCombat && !inCombat && data.isAiEnabled()) {
+            session.flushCombatEvents(server, pet);
         }
     }
 
     private static void tickWorldSummary(WeddingRingLlmSession session, MinecraftServer server,
                                           Mob pet, WeddingRingData data, UUID uid, ServerLevel level) {
         if (pet.getTarget() != null) {
-            SUMMARY_TIMERS.put(uid, 0); // reset timer during combat
+            SUMMARY_TIMERS.put(uid, 0);
             return;
         }
         int timer = SUMMARY_TIMERS.getOrDefault(uid, 0) + 1;
@@ -139,22 +134,18 @@ public final class WeddingRingLlmHandler {
     }
 
     private static String buildWorldSummary(Mob pet, WeddingRingData data, MinecraftServer server, ServerLevel level) {
-        // Distance and direction to owner
         String ownerInfo = "owner offline";
         ServerPlayer owner = server.getPlayerList().getPlayer(data.getOwnerUUID());
         if (owner != null && owner.level() == level) {
             double dist = pet.distanceTo(owner);
             int dx = (int)(owner.getX() - pet.getX());
             int dz = (int)(owner.getZ() - pet.getZ());
-            String card = cardinal(dx, dz);
-            ownerInfo = "%.1f blocks %s".formatted(dist, card);
+            ownerInfo = "%.1f blocks %s".formatted(dist, cardinal(dx, dz));
         }
 
-        // Health and hunger
         String health = "%.1f/%.1f ♥".formatted(pet.getHealth(), pet.getMaxHealth());
         String hunger = data.getFoodLevel() + "/20";
 
-        // Time of day (game time % 24000 = position within the current day cycle)
         long time = level.getGameTime() % 24000L;
         String timeStr;
         if      (time < 1000)  timeStr = "Dawn";
@@ -165,10 +156,8 @@ public final class WeddingRingLlmHandler {
         else if (time < 18000) timeStr = "Night";
         else                    timeStr = "Midnight";
 
-        // Weather
         String weather = level.isThundering() ? "Thunder" : level.isRaining() ? "Rain" : "Clear";
 
-        // Nearby hostiles
         var hostiles = level.getEntitiesOfClass(
             net.minecraft.world.entity.LivingEntity.class,
             pet.getBoundingBox().inflate(32),
@@ -199,9 +188,8 @@ public final class WeddingRingLlmHandler {
             """.formatted(ownerInfo, health, hunger, timeStr, weather, hostileStr).trim();
     }
 
-    // ── Combat event hooks (called from WeddingRingAttackHandler) ────────────
+    // ── Combat event hooks ────────────────────────────────────────────────────
 
-    /** Call when the pet kills a mob. */
     public static void onPetKill(Mob pet, net.minecraft.world.entity.LivingEntity victim) {
         WeddingRingLlmSession session = SESSIONS.get(pet.getUUID());
         if (session == null) return;
@@ -210,7 +198,6 @@ public final class WeddingRingLlmHandler {
         session.addCombatEvent("[Combat] I defeated a " + typePath + ".");
     }
 
-    /** Call when the pet takes a big hit. Threshold: 3 HP. */
     public static void onPetDamaged(Mob pet, float amount, net.minecraft.world.entity.LivingEntity attacker) {
         if (amount < 3f) return;
         WeddingRingLlmSession session = SESSIONS.get(pet.getUUID());
@@ -220,7 +207,6 @@ public final class WeddingRingLlmHandler {
         session.addCombatEvent("[Combat] I took %.1f damage from %s.".formatted(amount, typePath));
     }
 
-    /** Call when a mob starts targeting the pet (from WeddingRingTargetGoal.onMobTargetsPet). */
     public static void onTargetedByMob(Mob pet, net.minecraft.world.entity.LivingEntity attacker) {
         WeddingRingLlmSession session = SESSIONS.get(pet.getUUID());
         if (session == null) return;
@@ -229,36 +215,41 @@ public final class WeddingRingLlmHandler {
         session.addCombatEvent("[Combat] I am being attacked by " + typePath + ".");
     }
 
-    // ── Sleep compaction hook ────────────────────────────────────────────────
+    // ── Sleep compaction hook ─────────────────────────────────────────────────
 
-    /**
-     * Called on SleepFinishedTimeEvent — compacts all active pet sessions.
-     */
     public static void onSleepFinished(MinecraftServer server) {
         SESSIONS.forEach((uid, session) -> session.compact(server));
     }
 
-    // ── Chat hook ────────────────────────────────────────────────────────────
+    // ── Chat hook ─────────────────────────────────────────────────────────────
 
-    /**
-     * Called on ServerChatEvent. Queues the message as a trigger for all active LLM sessions.
-     */
     public static void onServerChat(MinecraftServer server, String senderName, String message) {
         String trigger = senderName + ": " + message;
-        for (ServerLevel level : server.getAllLevels()) {
-            level.getEntities().getAll().forEach(entity -> {
-                if (!(entity instanceof Mob mob)) return;
-                WeddingRingData data = WeddingRingData.get(mob);
-                if (data == null || !data.isAiEnabled()) return;
-                WeddingRingLlmSession session = SESSIONS.get(mob.getUUID());
-                if (session != null) session.addTrigger(server, trigger);
-            });
+        int count = 0;
+        for (var entry : SESSIONS.entrySet()) {
+            Mob mob = findPet(server, entry.getKey());
+            if (mob == null) continue;
+            WeddingRingData data = WeddingRingData.get(mob);
+            if (data == null || !data.isAiEnabled()) continue;
+            entry.getValue().addTrigger(server, trigger);
+            count++;
+        }
+        if (count > 0) {
+            WnirMod.LOGGER.info("[LlmHandler] chat '{}': {} → {} pet session(s)", senderName, message, count);
         }
     }
 
-    // ── Util ─────────────────────────────────────────────────────────────────
+    // ── Util ──────────────────────────────────────────────────────────────────
 
-    private static String cardinal(int dx, int dz) {
+    static Mob findPet(MinecraftServer server, UUID uid) {
+        for (ServerLevel level : server.getAllLevels()) {
+            var e = level.getEntity(uid);
+            if (e instanceof Mob mob && mob.isAlive()) return mob;
+        }
+        return null;
+    }
+
+    static String cardinal(int dx, int dz) {
         if (dx == 0 && dz == 0) return "here";
         double angle = Math.toDegrees(Math.atan2(dx, -dz));
         if (angle < 0) angle += 360;

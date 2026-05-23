@@ -235,7 +235,7 @@ public final class WeddingRingLlmTools {
                     }
                     if (!reachable) continue;
                     double dist = Math.sqrt(dx*dx + dy*dy + dz*dz);
-                    String cardinal = cardinal(dx, dz);
+                    String cardinal = WeddingRingLlmHandler.cardinal(dx, dz);
                     String regFull = BuiltInRegistries.BLOCK.getKey(state.getBlock()).toString();
                     results.add("%s at (%d, %d, %d) [%.1fm %s]".formatted(
                         regFull, pos.getX(), pos.getY(), pos.getZ(), dist, cardinal));
@@ -248,7 +248,7 @@ public final class WeddingRingLlmTools {
     private static String toolInspect(Mob pet, JsonObject args) {
         BlockPos pos = blockPosArg(args);
         if (pos == null) return "error: x, y, z required";
-        if (pet.blockPosition().distSqr(pos) > TOOL_RANGE * TOOL_RANGE * 3)
+        if (pet.blockPosition().distSqr(pos) > TOOL_RANGE * TOOL_RANGE)
             return "error: too far (max " + TOOL_RANGE + " blocks)";
 
         ServerLevel level = (ServerLevel) pet.level();
@@ -294,7 +294,7 @@ public final class WeddingRingLlmTools {
     private static String toolPut(Mob pet, WeddingRingData data, JsonObject args) {
         BlockPos pos = blockPosArg(args);
         if (pos == null) return "error: x, y, z required";
-        if (pet.blockPosition().distSqr(pos) > TOOL_RANGE * TOOL_RANGE * 3)
+        if (pet.blockPosition().distSqr(pos) > TOOL_RANGE * TOOL_RANGE)
             return "error: too far";
         String itemName = stringArg(args, "item_name", "");
         int count = intArg(args, "count", 1);
@@ -327,7 +327,7 @@ public final class WeddingRingLlmTools {
     private static String toolGet(Mob pet, WeddingRingData data, JsonObject args) {
         BlockPos pos = blockPosArg(args);
         if (pos == null) return "error: x, y, z required";
-        if (pet.blockPosition().distSqr(pos) > TOOL_RANGE * TOOL_RANGE * 3)
+        if (pet.blockPosition().distSqr(pos) > TOOL_RANGE * TOOL_RANGE)
             return "error: too far";
         String itemName = stringArg(args, "item_name", "");
         int count = intArg(args, "count", 1);
@@ -453,14 +453,6 @@ public final class WeddingRingLlmTools {
 
     private static String posStr(BlockPos pos) {
         return "(" + pos.getX() + ", " + pos.getY() + ", " + pos.getZ() + ")";
-    }
-
-    private static String cardinal(int dx, int dz) {
-        if (dx == 0 && dz == 0) return "here";
-        double angle = Math.toDegrees(Math.atan2(dx, -dz));
-        if (angle < 0) angle += 360;
-        String[] dirs = {"N","NE","E","SE","S","SW","W","NW"};
-        return dirs[(int)((angle + 22.5) / 45) % 8];
     }
 
     private static String stringArg(JsonObject args, String key, String def) {

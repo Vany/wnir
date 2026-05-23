@@ -8,11 +8,12 @@ import java.nio.file.Path;
 
 public final class WeddingRingLlmConfig {
 
-    public static String url                = "http://localhost:8090";
-    public static String model              = "";
-    public static float  temperature        = 0.5f;
-    public static int    contextWindow      = 262144;
-    public static int    memoryBudgetTokens = 131072;
+    public static String  url                = "http://localhost:8090";
+    // volatile: auto-detect writes from LLM executor thread; reads from server thread
+    public static volatile String model      = "";
+    public static float   temperature        = 0.5f;
+    public static int     contextWindow      = 262144;
+    public static int     memoryBudgetTokens = 131072;
 
     private static final String FILE_NAME = "wnir_llm.toml";
     private static final String DEFAULT_CONTENT = """

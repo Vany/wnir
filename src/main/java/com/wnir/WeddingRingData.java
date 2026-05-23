@@ -232,8 +232,6 @@ public final class WeddingRingData {
     /** Returns all buffered XP and clears the buffer. */
     public int  drainXp()         { int v = getXp(); if (v > 0) root.remove(KEY_XP_BUFFER); return v; }
 
-    // ── Hunger simulation ─────────────────────────────────────────────────
-
     public void addExhaustion(float amount) {
         float ex = getExhaustion() + amount;
         while (ex >= 4.0f) {
