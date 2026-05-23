@@ -20,7 +20,7 @@ public record WeddingRingCaptionPayload(String text) implements CustomPacketPayl
 
     public static final StreamCodec<FriendlyByteBuf, WeddingRingCaptionPayload> STREAM_CODEC = StreamCodec.of(
         (buf, p) -> buf.writeUtf(p.text()),
-        buf -> new WeddingRingCaptionPayload(buf.readUtf(256))
+        buf -> new WeddingRingCaptionPayload(buf.readUtf(Short.MAX_VALUE))
     );
 
     @Override

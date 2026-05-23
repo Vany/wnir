@@ -14,6 +14,8 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 /**
  * Per-pet LLM session.
@@ -132,14 +134,39 @@ public final class WeddingRingLlmSession {
             return;
         }
 
+        WnirMod.LOGGER.info("[LlmSession:{}] snapshot: mem={} todo={} hist={}",
+            shortId, snap.memory().size(), snap.todo().size(), snap.history().size());
+
+        // Detect history poisoned with "**[toolname]**" fake-tool spam and clear it
+        boolean poisoned = snap.history().stream().anyMatch(m ->
+            m.get("content") instanceof String s && s.contains("**["));
+        if (poisoned) {
+            WnirMod.LOGGER.warn("[LlmSession:{}] poisoned history detected, clearing", shortId);
+            snap = new WeddingRingLlmContext.Snapshot(
+                snap.petUUID(), snap.entityTypePath(), snap.petName(), snap.ownerName(),
+                snap.memory(), snap.todo(), java.util.List.of(), snap.environment());
+            server.execute(() -> {
+                Mob px = findPet(server);
+                WeddingRingData dx = px != null ? WeddingRingData.get(px) : null;
+                if (dx != null) dx.setLlmHistory(new ArrayList<>());
+            });
+        }
+
         List<Map<String, Object>> messages = WeddingRingLlmContext.build(snap, triggerText);
-        WnirMod.LOGGER.info("[LlmSession:{}] context: {} messages, ~{} tokens", shortId,
-            messages.size(), messages.stream().mapToInt(WeddingRingLlmContext::msgTokens).sum());
+        long sysMsgs  = messages.stream().filter(m -> "system".equals(m.get("role"))).count();
+        long histMsgs = messages.size() - sysMsgs - 1; // minus trigger
+        WnirMod.LOGGER.info("[LlmSession:{}] context: {} msgs (sys={} hist={} +trigger) ~{} tokens",
+            shortId, messages.size(), sysMsgs, histMsgs,
+            messages.stream().mapToInt(WeddingRingLlmContext::msgTokens).sum());
+
+        // Accumulates tool-call turns so they're saved to history alongside the final response.
+        List<Map<String, Object>> newTurns = new ArrayList<>();
 
         int maxRounds = 10;
         for (int round = 0; round < maxRounds; round++) {
             WeddingRingLlmClient.CompletionResult result =
-                WeddingRingLlmClient.complete(messages, TOOLS, "auto");
+                WeddingRingLlmClient.complete(messages, TOOLS, "auto",
+                    WeddingRingLlmConfig.maxResponseTokens, "pet:" + shortId + " R" + (round + 1));
             WnirMod.LOGGER.info("[LlmSession:{}] round {}: finish={}", shortId, round + 1, result.finishReason());
 
             if (result.isToolCall() && !result.toolCalls().isEmpty()) {
@@ -154,19 +181,62 @@ public final class WeddingRingLlmSession {
                     toolResults.add(WeddingRingLlmContext.toolResult(tc.id(), toolResult));
                 }
 
-                messages.add(WeddingRingLlmContext.assistantWithToolCalls(result.toolCalls()));
+                Map<String, Object> assistantMsg = WeddingRingLlmContext.assistantWithToolCalls(result.toolCalls());
+                messages.add(assistantMsg);
                 messages.addAll(toolResults);
+                newTurns.add(assistantMsg);
+                newTurns.addAll(toolResults);
+
                 particleState = ParticleState.THINKING;
             } else {
                 String content = result.content();
+                // Truncate at "**[" — model sometimes writes fake tool syntax in content.
+                if (content != null) {
+                    int spamIdx = content.indexOf("**[");
+                    if (spamIdx > 0) content = content.substring(0, spamIdx).strip();
+                }
                 WnirMod.LOGGER.info("[LlmSession:{}] response: {}", shortId,
                     content != null && content.length() > 300 ? content.substring(0, 300) + "…" : content);
 
                 if (content != null && !content.isBlank()) {
-                    // Append trigger + response to history, trim to budget, save on server thread
+                    // "Quoted text" → spoken aloud (yellow chat). Remainder → gray HUD (owner only).
+                    List<String> speech = extractSpeech(content);
+                    String narration = content.replaceAll("[\\u201C\"]([^\\u201C\\u201D\"]+)[\\u201D\"]", "")
+                        .replaceAll("[ \\t]*\\n[ \\t]*\\n[ \\t]*", "\n").strip();
+
+                    final List<String> finalSpeech = new ArrayList<>(speech);
+                    final String finalNarration = narration;
+                    final String finalContent = content;
+
+                    server.execute(() -> {
+                        Mob p = findPet(server);
+                        if (p == null) return;
+                        WeddingRingData d = WeddingRingData.get(p);
+                        if (d == null) return;
+
+                        for (String line : finalSpeech) {
+                            String msg = p.getDisplayName().getString() + ": " + line;
+                            server.getPlayerList().broadcastSystemMessage(
+                                net.minecraft.network.chat.Component.literal(msg)
+                                    .withStyle(net.minecraft.ChatFormatting.YELLOW), false);
+                        }
+
+                        if (!finalNarration.isBlank()) {
+                            net.minecraft.server.level.ServerPlayer owner =
+                                p.level().getServer().getPlayerList().getPlayer(d.getOwnerUUID());
+                            if (owner != null) {
+                                String caption = "§7" + (finalNarration.length() > 300
+                                    ? finalNarration.substring(0, 300) + "…" : finalNarration);
+                                WeddingRingCaptionPayload.send(owner, caption);
+                            }
+                        }
+                    });
+
+                    // Save: existing history + trigger + all tool turns + final prose
+                    newTurns.add(WeddingRingLlmContext.assistant(finalContent));
                     List<Map<String, Object>> history = new ArrayList<>(snap.history());
                     history.add(WeddingRingLlmContext.user(triggerText));
-                    history.add(WeddingRingLlmContext.assistant(content));
+                    history.addAll(newTurns);
 
                     int historyBudget = WeddingRingLlmConfig.contextWindow - WeddingRingLlmConfig.memoryBudgetTokens;
                     int used = history.stream().mapToInt(WeddingRingLlmContext::msgTokens).sum();
@@ -174,6 +244,7 @@ public final class WeddingRingLlmSession {
                         used -= WeddingRingLlmContext.msgTokens(history.get(0));
                         history.remove(0);
                     }
+                    while (history.size() > 60) history.remove(0);
 
                     final List<Map<String, Object>> finalHistory = history;
                     server.execute(() -> {
@@ -209,12 +280,29 @@ public final class WeddingRingLlmSession {
             catch (Exception e) { WnirMod.LOGGER.warn("[LlmSession:{}] compact snapshot timeout", shortId); return; }
             if (snap == null) { WnirMod.LOGGER.warn("[LlmSession:{}] compact: pet gone", shortId); return; }
 
+            // Poison check before compacting
+            boolean poisoned = snap.history().stream().anyMatch(m ->
+                m.get("content") instanceof String s && s.contains("**["));
+            if (poisoned) {
+                WnirMod.LOGGER.warn("[LlmSession:{}] compact: poisoned history, clearing and skipping", shortId);
+                server.execute(() -> {
+                    Mob px = findPet(server);
+                    WeddingRingData dx = px != null ? WeddingRingData.get(px) : null;
+                    if (dx != null) dx.setLlmHistory(new ArrayList<>());
+                });
+                return;
+            }
+
             List<Map<String, Object>> messages = WeddingRingLlmContext.build(snap,
-                "[Compact] Summarise everything important from this conversation into a concise " +
-                "bullet-point memory list and a numbered todo list. Be brief; discard unimportant details.");
+                "[Compact] Review the recent conversation. Extract only what belongs in long-term memory:\n" +
+                "- Bullet points for things you learned about yourself: strong opinions, unexpected feelings, " +
+                "capabilities, things you want or refuse.\n" +
+                "- Numbered tasks only for things you still want to do.\n" +
+                "Skip transient world state (health, weather, time, location) — those are always checked fresh.\n" +
+                "Be brief. One bullet = one concrete fact.");
 
             WeddingRingLlmClient.CompletionResult result =
-                WeddingRingLlmClient.complete(messages, null, "none");
+                WeddingRingLlmClient.complete(messages, null, "none", 1024, "pet:" + shortId + " compact");
 
             if (result.content() == null || result.content().isBlank()) {
                 WnirMod.LOGGER.warn("[LlmSession:{}] compact returned empty", shortId);
@@ -247,6 +335,17 @@ public final class WeddingRingLlmSession {
             WnirMod.LOGGER.info("[LlmSession:{}] compact done: {} memories, {} todos",
                 shortId, fm.size(), ft.size());
         });
+    }
+
+    /** Extract text inside "double quotes" (ASCII or Unicode smart quotes). */
+    private static List<String> extractSpeech(String content) {
+        List<String> result = new ArrayList<>();
+        Matcher m = Pattern.compile("[\\u201C\"]([^\\u201C\\u201D\"]+)[\\u201D\"]").matcher(content);
+        while (m.find()) {
+            String line = m.group(1).strip();
+            if (!line.isEmpty()) result.add(line);
+        }
+        return result;
     }
 
     public void shutdown() {

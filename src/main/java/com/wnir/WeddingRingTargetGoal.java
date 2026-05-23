@@ -15,6 +15,7 @@ import java.util.Comparator;
 import java.util.List;
 import java.util.UUID;
 
+
 /**
  * Target selection for the wedding ring pet.
  * Priority:
@@ -61,13 +62,28 @@ public class WeddingRingTargetGoal extends TargetGoal {
         super.start();
     }
 
+    @Override
+    public boolean canContinueToUse() {
+        if (!super.canContinueToUse()) return false;
+        LivingEntity current = pet.getTarget();
+        if (current == null) return false;
+        if (pet.level() instanceof ServerLevel sl &&
+            WeddingRingTargetFilter.isBlacklisted(pet.getUUID(), current.getUUID(), sl.getGameTime())) {
+            return false;
+        }
+        return true;
+    }
+
     private LivingEntity selectTarget(ServerPlayer owner, double ownerDist) {
         double scanRadius = Math.max(ownerDist, 8.0);
         Level level = pet.level();
+        long gameTime = level instanceof ServerLevel sl ? sl.getGameTime() : 0L;
+        UUID petUUID = pet.getUUID();
         AABB box = pet.getBoundingBox().inflate(scanRadius);
         List<LivingEntity> enemies = level.getEntitiesOfClass(LivingEntity.class, box,
             e -> e instanceof Enemy && e.isAlive()
-                && !(e instanceof OwnableEntity oe && oe.getOwner() != null));
+                && !(e instanceof OwnableEntity oe && oe.getOwner() != null)
+                && !WeddingRingTargetFilter.isBlacklisted(petUUID, e.getUUID(), gameTime));
 
         if (enemies.isEmpty()) return null;
 

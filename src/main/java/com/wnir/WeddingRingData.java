@@ -282,6 +282,21 @@ public final class WeddingRingData {
 
     @SuppressWarnings("unchecked")
     public List<Map<String, Object>> getLlmHistory() {
+        Tag tag = root.get(KEY_LLM_HISTORY);
+        if (tag instanceof ListTag list) {
+            // Current format: one StringTag per message
+            List<Map<String, Object>> result = new ArrayList<>();
+            for (Tag t : list) {
+                if (t instanceof StringTag st) {
+                    try {
+                        Map<String, Object> msg = GSON.fromJson(st.value(), Map.class);
+                        if (msg != null) result.add(msg);
+                    } catch (Exception ignored) {}
+                }
+            }
+            return result;
+        }
+        // Legacy format: entire history as one JSON string — migrate silently
         String json = root.getString(KEY_LLM_HISTORY).orElse("");
         if (json.isEmpty()) return new ArrayList<>();
         try {
@@ -291,7 +306,12 @@ public final class WeddingRingData {
     }
 
     public void setLlmHistory(List<Map<String, Object>> history) {
-        root.putString(KEY_LLM_HISTORY, GSON.toJson(history));
+        // Store as ListTag so no single NBT string exceeds the 65535-byte writeUTF limit
+        ListTag list = new ListTag();
+        for (Map<String, Object> msg : history) {
+            list.add(StringTag.valueOf(GSON.toJson(msg)));
+        }
+        root.put(KEY_LLM_HISTORY, list);
     }
 
     // ── Serialization helpers ─────────────────────────────────────────────

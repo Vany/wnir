@@ -14,6 +14,7 @@ public final class WeddingRingLlmConfig {
     public static float   temperature        = 0.5f;
     public static int     contextWindow      = 262144;
     public static int     memoryBudgetTokens = 131072;
+    public static int     maxResponseTokens  = 1024;
 
     private static final String FILE_NAME = "wnir_llm.toml";
     private static final String DEFAULT_CONTENT = """
@@ -23,12 +24,14 @@ public final class WeddingRingLlmConfig {
         # temperature — 0.0–1.0
         # context_window — max tokens (must match server --ctx-size)
         # memory_budget_tokens — token budget for system + memory + todo (first half)
+        # max_response_tokens — hard cap on each chat response (keeps replies brief)
 
         url = http://localhost:8090
         model =
         temperature = 0.5
         context_window = 262144
         memory_budget_tokens = 131072
+        max_response_tokens = 1024
         """;
 
     private WeddingRingLlmConfig() {}
@@ -54,7 +57,8 @@ public final class WeddingRingLlmConfig {
                     case "model"                -> model = v;
                     case "temperature"          -> { try { temperature = Float.parseFloat(v); } catch (Exception ignored) {} }
                     case "context_window"       -> { try { contextWindow = Integer.parseInt(v); } catch (Exception ignored) {} }
-                    case "memory_budget_tokens" -> { try { memoryBudgetTokens = Integer.parseInt(v); } catch (Exception ignored) {} }
+                    case "memory_budget_tokens"  -> { try { memoryBudgetTokens = Integer.parseInt(v); } catch (Exception ignored) {} }
+                    case "max_response_tokens"   -> { try { maxResponseTokens = Integer.parseInt(v); } catch (Exception ignored) {} }
                 }
             }
         } catch (IOException e) {

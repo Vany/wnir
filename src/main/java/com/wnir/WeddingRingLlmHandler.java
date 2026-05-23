@@ -22,7 +22,7 @@ import java.util.concurrent.ConcurrentHashMap;
  */
 public final class WeddingRingLlmHandler {
 
-    private static final int WORLD_SUMMARY_INTERVAL = 200;
+    private static final int WORLD_SUMMARY_INTERVAL = 1200; // 60 s — enough spacing between ambient updates
 
     private static final ConcurrentHashMap<UUID, WeddingRingLlmSession> SESSIONS = new ConcurrentHashMap<>();
     private static final ConcurrentHashMap<UUID, Integer> SUMMARY_TIMERS         = new ConcurrentHashMap<>();
@@ -130,10 +130,10 @@ public final class WeddingRingLlmHandler {
         SUMMARY_TIMERS.put(uid, 0);
 
         if (!data.isAiEnabled()) return;
-        session.addTrigger(server, buildWorldSummary(pet, data, server, level));
+        session.addTrigger(server, "[Tick] A moment passes.");
     }
 
-    private static String buildWorldSummary(Mob pet, WeddingRingData data, MinecraftServer server, ServerLevel level) {
+    static String buildWorldSummary(Mob pet, WeddingRingData data, MinecraftServer server, ServerLevel level) {
         String ownerInfo = "owner offline";
         ServerPlayer owner = server.getPlayerList().getPlayer(data.getOwnerUUID());
         if (owner != null && owner.level() == level) {
@@ -158,6 +158,9 @@ public final class WeddingRingLlmHandler {
 
         String weather = level.isThundering() ? "Thunder" : level.isRaining() ? "Rain" : "Clear";
 
+        int light = level.getMaxLocalRawBrightness(pet.blockPosition());
+        String lightStr = light < 5 ? "Dark (light " + light + ")" : "Lit (" + light + ")";
+
         var hostiles = level.getEntitiesOfClass(
             net.minecraft.world.entity.LivingEntity.class,
             pet.getBoundingBox().inflate(32),
@@ -178,14 +181,16 @@ public final class WeddingRingLlmHandler {
             hostileStr = "%d (closest: %s)".formatted(hostiles.size(), closestStr);
         }
 
-        return """
-            [World update]
-            Distance to owner: %s
-            Your health: %s  |  Hunger: %s
-            Time of day: %s
-            Weather: %s
-            Nearby hostiles: %s
-            """.formatted(ownerInfo, health, hunger, timeStr, weather, hostileStr).trim();
+        java.util.List<String> facts = new java.util.ArrayList<>(java.util.List.of(
+            "Distance to owner: " + ownerInfo,
+            "Health: " + health + "  |  Hunger: " + hunger,
+            "Time: " + timeStr,
+            "Weather: " + weather,
+            "Light: " + lightStr,
+            "Nearby hostiles: " + hostileStr
+        ));
+        java.util.Collections.shuffle(facts, java.util.concurrent.ThreadLocalRandom.current());
+        return "[World update]\n" + String.join("\n", facts);
     }
 
     // ── Combat event hooks ────────────────────────────────────────────────────

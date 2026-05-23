@@ -41,9 +41,11 @@ public final class WeddingRingTickHandler {
     }
 
     private static void tickPet(Mob pet, WeddingRingData data, ServerLevel level) {
-        // ── Hunger simulation ─────────────────────────────────────────────
-
         long gameTime = level.getGameTime();
+
+        WeddingRingTargetFilter.onServerTick(pet, gameTime);
+
+        // ── Hunger simulation ─────────────────────────────────────────────
         data.addExhaustion(0.005f); // base passive exhaustion per tick
 
         int foodLevel  = data.getFoodLevel();
@@ -237,6 +239,7 @@ public final class WeddingRingTickHandler {
         }
 
         WeddingRingLlmHandler.onPetDeath(pet.getUUID());
+        WeddingRingTargetFilter.clear(pet.getUUID());
         WeddingRingData.remove(pet);
         WeddingRingGoalManager.removeGoals(pet);
         WeddingRingAttributeManager.recalculate(pet);

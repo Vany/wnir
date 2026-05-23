@@ -9,9 +9,14 @@ import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.Container;
+import net.minecraft.world.entity.EquipmentSlot;
 import net.minecraft.world.entity.Mob;
+import net.minecraft.world.entity.ai.attributes.Attributes;
+import net.minecraft.world.item.AxeItem;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.MaceItem;
+import net.minecraft.core.component.DataComponents;
 import net.minecraft.world.item.crafting.CraftingInput;
 import net.minecraft.world.item.crafting.CraftingRecipe;
 import net.minecraft.world.item.crafting.Ingredient;
@@ -83,6 +88,11 @@ public final class WeddingRingLlmTools {
             case "put"       -> toolPut(pet, data, args);
             case "get"       -> toolGet(pet, data, args);
             case "goto"      -> toolGoto(pet, args);
+            case "stats"     -> toolStats(pet, data);
+            case "equip"     -> toolEquip(pet, data, args);
+            case "place"     -> toolPlace(pet, data, args);
+            case "done"      -> toolDone(data, args);
+            case "think"     -> "ok";
             default          -> "error: unknown tool " + toolName;
         };
     }
@@ -94,12 +104,7 @@ public final class WeddingRingLlmTools {
         if (text.isEmpty()) return "error: text required";
         String msg = pet.getDisplayName().getString() + ": " + text;
         server.getPlayerList().broadcastSystemMessage(
-            net.minecraft.network.chat.Component.literal(msg), false);
-
-        // Also send to owner as a caption for visibility
-        ServerLevel sl = (ServerLevel) pet.level();
-        ServerPlayer owner = sl.getServer().getPlayerList().getPlayer(data.getOwnerUUID());
-        if (owner != null) WeddingRingCaptionPayload.send(owner, msg);
+            net.minecraft.network.chat.Component.literal(msg).withStyle(net.minecraft.ChatFormatting.YELLOW), false);
         return "ok";
     }
 
@@ -110,6 +115,16 @@ public final class WeddingRingLlmTools {
         mem.add(text);
         data.setLlmMemory(mem);
         return "ok";
+    }
+
+    private static String toolDone(WeddingRingData data, JsonObject args) {
+        int index = intArg(args, "index", -1);
+        if (index < 1) return "error: index required (1-based)";
+        List<String> todo = new ArrayList<>(data.getLlmTodo());
+        if (index > todo.size()) return "error: index " + index + " out of range (have " + todo.size() + ")";
+        String removed = todo.remove(index - 1);
+        data.setLlmTodo(todo);
+        return "completed: " + removed;
     }
 
     private static String toolPlan(WeddingRingData data, JsonObject args) {
@@ -359,6 +374,130 @@ public final class WeddingRingLlmTools {
             moved += actual;
         }
         return "moved " + moved;
+    }
+
+    private static String toolStats(Mob pet, WeddingRingData data) {
+        StringBuilder sb = new StringBuilder();
+        sb.append("Health: ").append(String.format("%.1f/%.1f", pet.getHealth(), pet.getMaxHealth())).append("\n");
+        sb.append("Hunger: ").append(data.getFoodLevel()).append("/20\n");
+        appendAttr(sb, "Max health",          pet, Attributes.MAX_HEALTH);
+        appendAttr(sb, "Attack damage",       pet, Attributes.ATTACK_DAMAGE);
+        appendAttr(sb, "Attack speed",        pet, Attributes.ATTACK_SPEED);
+        appendAttr(sb, "Movement speed",      pet, Attributes.MOVEMENT_SPEED);
+        appendAttr(sb, "Armor",               pet, Attributes.ARMOR);
+        appendAttr(sb, "Armor toughness",     pet, Attributes.ARMOR_TOUGHNESS);
+        appendAttr(sb, "Knockback resistance",pet, Attributes.KNOCKBACK_RESISTANCE);
+        appendAttr(sb, "Follow range",        pet, Attributes.FOLLOW_RANGE);
+        return sb.toString().trim();
+    }
+
+    private static void appendAttr(StringBuilder sb, String label, Mob pet,
+                                    net.minecraft.core.Holder<net.minecraft.world.entity.ai.attributes.Attribute> attr) {
+        var instance = pet.getAttribute(attr);
+        if (instance != null) sb.append(label).append(": ")
+            .append(String.format("%.2f", instance.getValue())).append("\n");
+    }
+
+    private static String toolEquip(Mob pet, WeddingRingData data, JsonObject args) {
+        String itemName = stringArg(args, "item_name", "");
+        if (itemName.isEmpty()) return "error: item_name required";
+
+        Identifier id = Identifier.tryParse(itemName);
+        if (id == null) return "error: invalid identifier";
+        Item item = BuiltInRegistries.ITEM.getValue(id);
+        if (item == null || item == net.minecraft.world.item.Items.AIR) return "unknown item: " + itemName;
+
+        // Find in storage
+        int storageSlot = -1;
+        ItemStack found = ItemStack.EMPTY;
+        for (int i = 0; i < WeddingRingMenu.STD_SLOT_COUNT; i++) {
+            ItemStack s = data.getStdSlot(i);
+            if (!s.isEmpty() && s.getItem() == item) { storageSlot = i; found = s; break; }
+        }
+        if (storageSlot < 0) return "error: " + itemName + " not in storage";
+
+        // Broken item check
+        if (found.getMaxDamage() > 0 && found.getDamageValue() >= found.getMaxDamage()) {
+            return "broken: " + found.getHoverName().getString() + " is broken (0 durability) — cannot equip";
+        }
+
+        // Detect which ring slot this item belongs to
+        String slotName = detectSlot(found, data);
+        if (slotName == null) return "error: cannot determine equipment slot for " + itemName;
+
+        // Swap: move current occupant back to the storage slot the new item came from
+        ItemStack current = getSlot(data, slotName);
+        data.setStdSlot(storageSlot, current); // empty or previous item
+        setSlot(data, slotName, found);
+
+        WeddingRingAttributeManager.recalculate(pet);
+        String result = "equipped " + found.getHoverName().getString() + " → " + slotName;
+        if (!current.isEmpty()) result += " (returned " + current.getHoverName().getString() + " to storage)";
+        return result;
+    }
+
+    private static String detectSlot(ItemStack s, WeddingRingData data) {
+        if (s.has(DataComponents.WEAPON) || s.has(DataComponents.KINETIC_WEAPON)
+                || s.getItem() instanceof MaceItem || s.getItem() instanceof AxeItem) return "weapon";
+        if (s.has(DataComponents.BLOCKS_ATTACKS)) return "shield";
+        var eq = s.get(DataComponents.EQUIPPABLE);
+        if (eq == null) return null;
+        return switch (eq.slot()) {
+            case HEAD  -> data.hasArmor() ? "helmet"     : null;
+            case CHEST -> data.hasArmor() ? "chestplate" : null;
+            case LEGS  -> data.hasArmor() ? "leggings"   : null;
+            case FEET  -> data.hasArmor() ? "boots"      : null;
+            default    -> null;
+        };
+    }
+
+    private static ItemStack getSlot(WeddingRingData data, String slot) {
+        return switch (slot) {
+            case "weapon"     -> data.getWeapon();
+            case "shield"     -> data.getShield();
+            case "helmet"     -> data.getArmorHead();
+            case "chestplate" -> data.getArmorChest();
+            case "leggings"   -> data.getArmorLegs();
+            case "boots"      -> data.getArmorFeet();
+            default           -> ItemStack.EMPTY;
+        };
+    }
+
+    private static void setSlot(WeddingRingData data, String slot, ItemStack s) {
+        switch (slot) {
+            case "weapon"     -> data.setWeapon(s);
+            case "shield"     -> data.setShield(s);
+            case "helmet"     -> data.setArmorHead(s);
+            case "chestplate" -> data.setArmorChest(s);
+            case "leggings"   -> data.setArmorLegs(s);
+            case "boots"      -> data.setArmorFeet(s);
+        }
+    }
+
+    private static String toolPlace(Mob pet, WeddingRingData data, JsonObject args) {
+        BlockPos pos = blockPosArg(args);
+        if (pos == null) return "error: x, y, z required";
+        if (pet.blockPosition().distSqr(pos) > TOOL_RANGE * TOOL_RANGE)
+            return "error: too far";
+
+        String itemName = stringArg(args, "item_name", "");
+        if (itemName.isEmpty()) return "error: item_name required";
+
+        Identifier id = Identifier.tryParse(itemName);
+        if (id == null) return "error: invalid identifier";
+        Item item = BuiltInRegistries.ITEM.getValue(id);
+        if (item == null || item == net.minecraft.world.item.Items.AIR) return "unknown item: " + itemName;
+        if (!(item instanceof net.minecraft.world.item.BlockItem blockItem))
+            return "error: " + itemName + " is not a placeable block";
+
+        if (countInStorage(data, item) == 0) return "error: " + itemName + " not in storage";
+
+        ServerLevel level = (ServerLevel) pet.level();
+        if (!level.getBlockState(pos).canBeReplaced()) return "error: position is occupied";
+
+        level.setBlockAndUpdate(pos, blockItem.getBlock().defaultBlockState());
+        consumeFromStorage(data, item, 1);
+        return "placed " + blockItem.getBlock().getName().getString() + " at " + posStr(pos);
     }
 
     private static String toolGoto(Mob pet, JsonObject args) {

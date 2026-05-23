@@ -198,6 +198,21 @@ public void render(GuiGraphics g, int mouseX, int mouseY, float partialTick) {
 
 - **LightingPostBlock** — warding column block, light level 15. No BE logic; reuses `WardingColumnBlockEntity`. Participates in mixed column height. Recipe: glowstone_dust × 4 + warding_post → 4. Dungeon loot weight 3.
 
+## LLM Companion Patterns (§9)
+
+- **Tool naming matters:** naming tools after output-format concepts (`say`, `think`) causes Qwen3 to write `**[say]** "text"` as plain text instead of making API calls. Keep tools scoped to game actions only. Speech → `"quoted text"` in content; thinking → native Qwen3 `reasoning_content`.
+- **tool_choice "required" is silently ignored** by llama.cpp. Use `"auto"`.
+- **Poison detection:** if any history message contains `**[`, clear history immediately. The model copies garbage patterns on the next call, amplifying each iteration. Detect in both `runCallLoop` and `compact`.
+- **Content truncation at `**[`:** before saving content to history, truncate at the first `**[`. This prevents new pollution if a bad response slips through detection.
+- **History compaction prompt:** ask for self-knowledge only (opinions, capabilities, discoveries). Explicitly exclude transient world state (health, weather, time). Old prompt caused the model to summarise ephemeral sensor readings into permanent memory.
+- **Token budget:** `max_tokens = 1024` keeps Qwen3 from filling the budget with repetition. Thinking is 300–600 tokens; prose is 100–400. 2048 was feeding copy-loops.
+- **World summary interval:** 1200 ticks (60 s). 200 ticks caused permanent in-flight state — the model never got a rest between ambient pings.
+- **context_window config** must match llama.cpp `--ctx-size` exactly. Mismatch causes silent KV-cache truncation and incoherent responses.
+- **Trigger token budget:** the trigger passed to `build()` is `environment + "\n\n" + triggerText`. The budget estimate must include the environment prefix, not just `triggerText`.
+- **SSE streaming:** `WeddingRingLlmClient` reads `reasoning_content` deltas → `WeddingRingLlmLogger`; `content` deltas → assembled response; `tool_calls` deltas accumulated by index across chunks.
+- **Speech routing:** `"quoted text"` extracted by regex and broadcast to all as yellow chat. Non-quoted remainder sent to owner only as gray (`§7`) HUD caption via `WeddingRingCaptionPayload`.
+- **Research:** `research/llm_companion_qwen3.md` — all Qwen3/llama.cpp findings in one place.
+
 ## Known Limitations / Issues
 
 - Spawner placed *after* agitator is only detected on chunk reload (`onLoad`). `neighborChanged` takes `Orientation` in 1.21.11 — not currently overridden to watch for new spawners.

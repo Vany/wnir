@@ -64,6 +64,12 @@ public final class WeddingRingAttackHandler {
         WeddingRingData data = WeddingRingData.get(mob);
         if (data == null) return;
 
+        // Notify target filter if this damage came from the pet's current target
+        if (event.getSource().getEntity() instanceof LivingEntity attacker
+                && attacker == mob.getTarget()) {
+            WeddingRingTargetFilter.onDamagedByTarget(mob.getUUID());
+        }
+
         ItemStack shield = data.getShield();
         if (shield.isEmpty()) return;
         BlocksAttacks blockData = shield.get(DataComponents.BLOCKS_ATTACKS);

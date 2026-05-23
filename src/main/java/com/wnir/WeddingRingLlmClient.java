@@ -64,6 +64,27 @@ public final class WeddingRingLlmClient {
     public static CompletionResult complete(List<Map<String, Object>> messages,
                                             JsonArray tools,
                                             String toolChoice) {
+        return complete(messages, tools, toolChoice, WeddingRingLlmConfig.maxResponseTokens, "");
+    }
+
+    public static CompletionResult complete(List<Map<String, Object>> messages,
+                                            JsonArray tools,
+                                            String toolChoice,
+                                            int maxTokens) {
+        return complete(messages, tools, toolChoice, maxTokens, "");
+    }
+
+    /**
+     * Stream a /v1/chat/completions request via SSE.
+     * Tokens are written to llm.log as they arrive; the assembled result is returned when done.
+     *
+     * @param logCtx  short label written to llm.log header (e.g. "pet:abc R1")
+     */
+    public static CompletionResult complete(List<Map<String, Object>> messages,
+                                            JsonArray tools,
+                                            String toolChoice,
+                                            int maxTokens,
+                                            String logCtx) {
         String model = WeddingRingLlmConfig.model;
         if (model.isEmpty()) {
             model = autoDetectModel();
@@ -74,8 +95,8 @@ public final class WeddingRingLlmClient {
         JsonObject body = new JsonObject();
         body.addProperty("model", model);
         body.addProperty("temperature", WeddingRingLlmConfig.temperature);
-        // Reserve half the history budget for response (generous upper bound)
-        body.addProperty("max_tokens", WeddingRingLlmConfig.contextWindow / 4);
+        body.addProperty("max_tokens", maxTokens);
+        body.addProperty("stream", true);
         body.add("messages", GSON.toJsonTree(messages));
         if (tools != null && !tools.isEmpty()) {
             body.add("tools", tools);
@@ -84,61 +105,120 @@ public final class WeddingRingLlmClient {
             body.addProperty("tool_choice", "none");
         }
 
-        String requestJson = GSON.toJson(body);
-        WnirMod.LOGGER.info("[LlmClient] → POST /v1/chat/completions | model={} msgs={} maxTok={}",
-            model, messages.size(), body.get("max_tokens").getAsInt());
-        WnirMod.LOGGER.info("[LlmClient] request: {}",
-            requestJson.length() > 1000 ? requestJson.substring(0, 1000) + "…" : requestJson);
+        WnirMod.LOGGER.info("[LlmClient] → POST /v1/chat/completions | model={} msgs={} maxTok={} ctx={}",
+            model, messages.size(), maxTokens, logCtx.isEmpty() ? "-" : logCtx);
+
+        WeddingRingLlmLogger.logCallStart(
+            logCtx.isEmpty() ? model : logCtx + "  model=" + model, messages);
 
         try {
             HttpRequest req = HttpRequest.newBuilder()
                 .uri(URI.create(WeddingRingLlmConfig.url + "/v1/chat/completions"))
                 .header("Content-Type", "application/json")
-                .POST(HttpRequest.BodyPublishers.ofString(requestJson))
+                .POST(HttpRequest.BodyPublishers.ofString(GSON.toJson(body)))
                 .timeout(Duration.ofSeconds(120))
                 .build();
-            HttpResponse<String> resp = HTTP.send(req, HttpResponse.BodyHandlers.ofString());
-            WnirMod.LOGGER.info("[LlmClient] ← {} | {}",
-                resp.statusCode(),
-                resp.body().length() > 3000 ? resp.body().substring(0, 3000) + "…" : resp.body());
-            return parseResponse(resp.body());
+
+            HttpResponse<java.util.stream.Stream<String>> resp =
+                HTTP.send(req, HttpResponse.BodyHandlers.ofLines());
+            WnirMod.LOGGER.info("[LlmClient] ← {}", resp.statusCode());
+
+            // Accumulate streamed SSE chunks
+            java.util.LinkedHashMap<Integer, ToolCallBuilder> tcBuilders = new java.util.LinkedHashMap<>();
+            StringBuilder contentBuilder = new StringBuilder();
+            String[] finishReason = {"stop"};
+            boolean[] thinkingStarted = {false};
+            boolean[] thinkingDone    = {false};
+
+            try (var lines = resp.body()) {
+                lines.forEach(line -> {
+                    if (!line.startsWith("data: ")) return;
+                    String data = line.substring(6).trim();
+                    if ("[DONE]".equals(data)) return;
+                    try {
+                        JsonObject chunk  = JsonParser.parseString(data).getAsJsonObject();
+                        JsonObject choice = chunk.getAsJsonArray("choices").get(0).getAsJsonObject();
+
+                        JsonElement fr = choice.get("finish_reason");
+                        if (fr != null && !fr.isJsonNull()) finishReason[0] = fr.getAsString();
+
+                        JsonObject delta = choice.getAsJsonObject("delta");
+                        if (delta == null) return;
+
+                        // Thinking token (Qwen3 reasoning_content)
+                        if (delta.has("reasoning_content") && !delta.get("reasoning_content").isJsonNull()) {
+                            String token = delta.get("reasoning_content").getAsString();
+                            if (!token.isEmpty()) {
+                                if (!thinkingStarted[0]) {
+                                    WeddingRingLlmLogger.logThinkingStart();
+                                    thinkingStarted[0] = true;
+                                }
+                                WeddingRingLlmLogger.appendThinkingToken(token);
+                            }
+                        }
+
+                        // Content token
+                        if (delta.has("content") && !delta.get("content").isJsonNull()) {
+                            String token = delta.get("content").getAsString();
+                            if (!token.isEmpty()) {
+                                if (thinkingStarted[0] && !thinkingDone[0]) {
+                                    WeddingRingLlmLogger.logThinkingEnd();
+                                    thinkingDone[0] = true;
+                                }
+                                contentBuilder.append(token);
+                                WeddingRingLlmLogger.appendToken(token);
+                            }
+                        }
+
+                        // Tool call argument chunks
+                        if (delta.has("tool_calls")) {
+                            for (JsonElement tcEl : delta.getAsJsonArray("tool_calls")) {
+                                JsonObject tc  = tcEl.getAsJsonObject();
+                                int idx = tc.get("index").getAsInt();
+                                ToolCallBuilder b = tcBuilders.computeIfAbsent(idx, i -> new ToolCallBuilder());
+                                if (tc.has("id") && !tc.get("id").isJsonNull())
+                                    b.id = tc.get("id").getAsString();
+                                if (tc.has("function")) {
+                                    JsonObject fn = tc.getAsJsonObject("function");
+                                    if (fn.has("name") && !fn.get("name").isJsonNull())
+                                        b.name = fn.get("name").getAsString();
+                                    if (fn.has("arguments") && !fn.get("arguments").isJsonNull())
+                                        b.args.append(fn.get("arguments").getAsString());
+                                }
+                            }
+                        }
+                    } catch (Exception e) {
+                        WnirMod.LOGGER.warn("[LlmClient] SSE parse: {}", e.getMessage());
+                    }
+                });
+            }
+
+            // Log completed tool calls
+            for (ToolCallBuilder b : tcBuilders.values()) {
+                WeddingRingLlmLogger.logToolCall(b.name, b.args.toString());
+            }
+            WeddingRingLlmLogger.logFinish(finishReason[0]);
+            WnirMod.LOGGER.info("[LlmClient] finish={} content={} toolCalls={}",
+                finishReason[0], contentBuilder.length(), tcBuilders.size());
+
+            List<ToolCall> toolCalls = tcBuilders.entrySet().stream()
+                .sorted(Map.Entry.comparingByKey())
+                .map(e -> new ToolCall(e.getValue().id, e.getValue().name, e.getValue().args.toString()))
+                .collect(java.util.stream.Collectors.toList());
+
+            return new CompletionResult(finishReason[0], contentBuilder.toString(), toolCalls);
+
         } catch (Exception e) {
+            WeddingRingLlmLogger.logFinish("error: " + e.getMessage());
             WnirMod.LOGGER.error("[LlmClient] HTTP error: {}", e.getMessage());
             return new CompletionResult("stop", "[error: " + e.getMessage() + "]", List.of());
         }
     }
 
-    private static CompletionResult parseResponse(String json) {
-        try {
-            JsonObject root     = JsonParser.parseString(json).getAsJsonObject();
-            JsonObject choice   = root.getAsJsonArray("choices").get(0).getAsJsonObject();
-            String finishReason = choice.get("finish_reason").getAsString();
-            JsonObject msg      = choice.getAsJsonObject("message");
-
-            // content may be null/empty when tool_calls is present
-            String content = "";
-            if (msg.has("content") && !msg.get("content").isJsonNull()) {
-                content = msg.get("content").getAsString();
-            }
-            // reasoning_content is ignored (never stored in history)
-
-            List<ToolCall> toolCalls = new ArrayList<>();
-            if (msg.has("tool_calls") && !msg.get("tool_calls").isJsonNull()) {
-                for (JsonElement el : msg.getAsJsonArray("tool_calls")) {
-                    JsonObject tc = el.getAsJsonObject();
-                    String id   = tc.get("id").getAsString();
-                    JsonObject fn = tc.getAsJsonObject("function");
-                    String name = fn.get("name").getAsString();
-                    String args = fn.has("arguments") ? fn.get("arguments").getAsString() : "{}";
-                    toolCalls.add(new ToolCall(id, name, args));
-                }
-            }
-            return new CompletionResult(finishReason, content, toolCalls);
-        } catch (Exception e) {
-            WnirMod.LOGGER.error("[LlmClient] Parse error: {} | body snippet: {}",
-                e.getMessage(), json.length() > 200 ? json.substring(0, 200) : json);
-            return new CompletionResult("stop", "[parse error]", List.of());
-        }
+    private static class ToolCallBuilder {
+        String id = "";
+        String name = "";
+        final StringBuilder args = new StringBuilder();
     }
 
     // ── Tool schema helpers ──────────────────────────────────────────────────
@@ -146,13 +226,13 @@ public final class WeddingRingLlmClient {
     /** Build the full OpenAI tools array for the pet companion. */
     public static JsonArray buildToolsArray() {
         JsonArray arr = new JsonArray();
-        arr.add(buildTool("say", "Send a chat message as the pet",
-            prop("text", "string", "The message text")));
         arr.add(buildTool("remember", "Append a bullet to long-term memory",
             prop("text", "string", "The memory text")));
         arr.add(buildTool("plan", "Append an entry to the todo list",
             prop("text", "string", "The task description")));
         arr.add(buildTool("todo", "Return the full current todo list", new JsonObject()));
+        arr.add(buildTool("done", "Mark a todo item as completed and remove it by its 1-based index",
+            prop("index", "integer", "1-based index of the completed todo item")));
         arr.add(buildTool("item_info", "Get info about a Minecraft item by registry name",
             prop("item_name", "string", "Registry path, e.g. minecraft:diamond")));
         arr.add(buildTool("craft", "Craft one unit of an item using pet storage",
@@ -174,6 +254,15 @@ public final class WeddingRingLlmClient {
                 prop("count", "integer", "Number to transfer"))));
         arr.add(buildTool("goto", "Navigate the pet to coordinates",
             xyzProps("Destination coordinates")));
+        arr.add(buildTool("stats", "Get all character attributes and current status", new JsonObject()));
+        arr.add(buildTool("equip",
+            "Move an item from pet storage into its appropriate equipment slot (weapon, shield, or armor). " +
+            "Returns 'broken: ...' if the item has zero durability.",
+            prop("item_name", "string", "Registry path of the item to equip, e.g. minecraft:diamond_sword")));
+        arr.add(buildTool("place", "Place a block from pet storage at the given coordinates. Returns 'error: too far' if out of range.",
+            mergeProps(
+                prop("item_name", "string", "Registry path of the block item to place, e.g. minecraft:dirt"),
+                xyzProps("Target position to place the block"))));
         return arr;
     }
 
