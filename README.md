@@ -35,6 +35,7 @@ All items and blocks show a one-sentence description in their tooltip. Hold **SH
 - [Fluids](#fluids)
   - [Magic Cellulose](#magic-cellulose)
 - [Items](#items)
+  - [Wedding Ring](#wedding-ring)
   - [Blue Sticky Tape](#blue-sticky-tape)
   - [Mousey Compass](#mousey-compass)
 - [Recipes](#recipes)
@@ -366,6 +367,56 @@ A pale-pink fluid produced by the Celluloser. Collect it with a bucket to get a 
 ---
 
 ## Items
+
+### Wedding Ring
+
+Bonds a player to their tamed pet, giving the pet a full combat and survival kit managed through a custom inventory screen.
+
+**Binding:**
+- Craft a pair of rings (see recipe)
+- **Shift + right-click** on your tamed pet to bind one ring to it; keep the other in your inventory
+
+**Opening the inventory:**
+- **Right-click** on the bound pet to open the ring screen
+
+**Slots:**
+
+| Slot | Accepts |
+|------|---------|
+| Weapon | Sword, axe, spear, mace |
+| Shield | Any shield |
+| Potions | Any potion (vanilla or modded) — auto-used when health drops below 50% |
+| Helmet / Chestplate / Leggings / Boots | Armor for pets that support it |
+
+Below the ring slots is a **27-slot standard storage grid**. Put food here — the pet eats from it automatically when hungry, and will also feed your other nearby pets that are hurt.
+
+**Combat AI:**
+- Attacks any hostile mob within `dist(pet → owner)` blocks that threatens the player or the pet itself
+- Melee, spear, and mace goals automatically selected based on the equipped weapon
+- Shield blocking reduces incoming damage and tracks durability
+
+**Healing:**
+- Any potion dropped into the Potions slot is stored internally (unlimited count, grouped by potion type)
+- When health falls below 50%, the pet drinks the best available healing potion
+- Potions with Instant Health or Regeneration are preferred; any stored potion is used as a fallback
+
+**Pet feeding:**
+- Every 5 seconds, if the ring pet is not actively fighting (or is in Calm mode), it scans for your other tamed pets within 32 blocks that are below full health and feeds them from its own storage
+- For ring-bound targets, both HP and hunger level are restored
+
+**Buttons in the GUI:**
+- **Calm** — pet stops fighting; useful for a dedicated caretaker pet
+- **AI** — toggles the wedding ring combat AI on/off
+
+**Unbinding / death:**
+- Shift+right-click the bound pet to unbind — all items are returned
+- If the pet dies, all stored items (including potions) drop at its position and the ring item breaks into 7 gold ingots
+
+| | |
+|---|---|
+| **Recipe** | Shaped: 7 gold ingots (`"GGG" / "G G" / "GGG"`) → 2 rings |
+
+---
 
 ### Blue Sticky Tape
 

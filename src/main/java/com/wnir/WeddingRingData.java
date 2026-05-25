@@ -8,10 +8,11 @@ import net.minecraft.nbt.ListTag;
 import net.minecraft.nbt.NbtOps;
 import net.minecraft.nbt.StringTag;
 import net.minecraft.nbt.Tag;
+import net.minecraft.world.effect.MobEffectInstance;
+import net.minecraft.world.effect.MobEffects;
 import net.minecraft.world.entity.Mob;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.alchemy.PotionContents;
-import net.minecraft.world.item.alchemy.Potions;
 
 import java.lang.reflect.Type;
 import java.util.ArrayList;
@@ -27,9 +28,7 @@ import java.util.UUID;
  *   OwnerUUID     String
  *   weapon        ItemStack NBT (optional)
  *   shield        ItemStack NBT (optional)
- *   HealingSample ItemStack NBT (1 unit, preserves PotionContents)
- *   HealingCount  int
-
+ *   PotionList    ListTag of {Key:String, Sample:ItemStack NBT, Count:int}
  *   food        ItemStack NBT (optional)
  *   armor_head  ItemStack NBT (optional)   — absent for wolves
  *   armor_chest ItemStack NBT (optional)
@@ -47,12 +46,11 @@ public final class WeddingRingData {
     private static final String KEY_OWNER      = "OwnerUUID";
     private static final String KEY_WEAPON     = "weapon";
     private static final String KEY_SHIELD     = "shield";
-    private static final String KEY_STD_INV       = "si"; // prefix for 27 standard storage slots
+    private static final String KEY_STD_INV    = "si"; // prefix for 27 standard storage slots
 
-    private static final String KEY_HEAL_SAMPLE_1 = "HealSample1"; // ItemStack NBT for Healing I
-    private static final String KEY_HEAL_SAMPLE_2 = "HealSample2"; // ItemStack NBT for Healing II
-    private static final String KEY_HEAL_COUNT_1  = "HealCount1";
-    private static final String KEY_HEAL_COUNT_2  = "HealCount2";
+    // Potion map: ListTag of CompoundTag {Key:String, Sample:ItemStack NBT, Count:int}
+    private static final String KEY_POTION_LIST  = "PotionList";
+
     private static final String KEY_ARMOR_HEAD  = "armor_head";
     private static final String KEY_ARMOR_CHEST = "armor_chest";
     private static final String KEY_ARMOR_LEGS  = "armor_legs";
@@ -86,7 +84,11 @@ public final class WeddingRingData {
     public static WeddingRingData get(Mob pet) {
         CompoundTag pd = pet.getPersistentData();
         Tag existing = pd.get(ROOT_KEY);
-        if (existing instanceof CompoundTag ct) return new WeddingRingData(pet, ct);
+        if (existing instanceof CompoundTag ct) {
+            WeddingRingData data = new WeddingRingData(pet, ct);
+            data.migrateOldHealingSlots();
+            return data;
+        }
         return null;
     }
 
@@ -139,77 +141,150 @@ public final class WeddingRingData {
     public ItemStack getStdSlot(int i)            { return readStack(KEY_STD_INV + i); }
     public void      setStdSlot(int i, ItemStack s) { writeStack(KEY_STD_INV + i, s); }
 
-    // ── Healing slot ──────────────────────────────────────────────────────
+    // ── Potion map storage ────────────────────────────────────────────────
 
-    public int getHealingCount1() { return root.getIntOr(KEY_HEAL_COUNT_1, 0); }
-    public int getHealingCount2() { return root.getIntOr(KEY_HEAL_COUNT_2, 0); }
-    public int getTotalHealingCount() { return getHealingCount1() + getHealingCount2(); }
+    /** True for any item that carries POTION_CONTENTS (vanilla or modded potions). */
+    public static boolean isPotion(ItemStack stack) {
+        return !stack.isEmpty() && stack.get(net.minecraft.core.component.DataComponents.POTION_CONTENTS) != null;
+    }
+
+    /** Returns the total count across all stored potion types. */
+    public int getTotalPotionCount() {
+        Tag t = root.get(KEY_POTION_LIST);
+        if (!(t instanceof ListTag list)) return 0;
+        int sum = 0;
+        for (Tag entry : list) {
+            if (entry instanceof CompoundTag ct) sum += ct.getIntOr("Count", 0);
+        }
+        return sum;
+    }
 
     /**
-     * Absorbs the stack into the internal buffer. Does not modify the ItemStack.
-     * The first potion of each tier is stored as a sample to reconstruct drops on death.
+     * Absorbs the stack into the potion map. Groups by potion type using a stable fingerprint
+     * so vanilla and modded potions are stored separately by type.
      */
-    public void addHealingPotion(ItemStack stack) {
-        if (stack.isEmpty() || !isHealingPotion(stack)) return;
+    public void addPotion(ItemStack stack) {
+        if (!isPotion(stack)) return;
         PotionContents contents = stack.get(net.minecraft.core.component.DataComponents.POTION_CONTENTS);
-        boolean isStrong = contents != null && contents.is(Potions.STRONG_HEALING);
+        assert contents != null;
+        String key = potionKey(contents);
         int amount = stack.getCount();
-        if (isStrong) {
-            if (getHealingCount2() == 0) writeStack(KEY_HEAL_SAMPLE_2, stack.copyWithCount(1));
-            root.putInt(KEY_HEAL_COUNT_2, getHealingCount2() + amount);
-        } else {
-            if (getHealingCount1() == 0) writeStack(KEY_HEAL_SAMPLE_1, stack.copyWithCount(1));
-            root.putInt(KEY_HEAL_COUNT_1, getHealingCount1() + amount);
+
+        Tag t = root.get(KEY_POTION_LIST);
+        ListTag list = (t instanceof ListTag lt) ? lt : new ListTag();
+
+        for (Tag entry : list) {
+            if (!(entry instanceof CompoundTag ct)) continue;
+            if (key.equals(ct.getString("Key").orElse(""))) {
+                ct.putInt("Count", ct.getIntOr("Count", 0) + amount);
+                root.put(KEY_POTION_LIST, list);
+                return;
+            }
         }
+
+        CompoundTag entry = new CompoundTag();
+        entry.putString("Key", key);
+        writeStackTo(entry, "Sample", stack.copyWithCount(1));
+        entry.putInt("Count", amount);
+        list.add(entry);
+        root.put(KEY_POTION_LIST, list);
     }
 
     /**
-     * Consumes one potion for healing. Uses Healing I first, then Healing II.
-     * Returns amplifier (0 = Healing I, 1 = Healing II), or -1 if none available.
+     * Consumes one potion, preferring those with an INSTANT_HEALTH or REGENERATION effect.
+     * Returns a sample ItemStack of the consumed type (for applying effects), or EMPTY if none stored.
      */
-    public int useHealingPotion() {
-        int c1 = getHealingCount1();
-        if (c1 > 0) {
-            root.putInt(KEY_HEAL_COUNT_1, c1 - 1);
-            if (c1 - 1 <= 0) root.remove(KEY_HEAL_SAMPLE_1);
-            return 0;
+    public ItemStack usePotion() {
+        Tag t = root.get(KEY_POTION_LIST);
+        if (!(t instanceof ListTag list) || list.isEmpty()) return ItemStack.EMPTY;
+
+        int bestIdx = -1;
+        boolean bestHasHealing = false;
+        for (int i = 0; i < list.size(); i++) {
+            if (!(list.get(i) instanceof CompoundTag ct)) continue;
+            if (ct.getIntOr("Count", 0) <= 0) continue;
+            ItemStack sample = readStackFrom(ct, "Sample");
+            PotionContents contents = sample.get(net.minecraft.core.component.DataComponents.POTION_CONTENTS);
+            boolean hasHealing = contents != null && hasHealingEffect(contents);
+            if (bestIdx < 0 || (hasHealing && !bestHasHealing)) {
+                bestIdx = i;
+                bestHasHealing = hasHealing;
+            }
+            if (bestHasHealing) break;
         }
-        int c2 = getHealingCount2();
-        if (c2 > 0) {
-            root.putInt(KEY_HEAL_COUNT_2, c2 - 1);
-            if (c2 - 1 <= 0) root.remove(KEY_HEAL_SAMPLE_2);
-            return 1;
+        if (bestIdx < 0) return ItemStack.EMPTY;
+
+        CompoundTag ct = (CompoundTag) list.get(bestIdx);
+        ItemStack sample = readStackFrom(ct, "Sample");
+        int count = ct.getIntOr("Count", 0);
+        if (count <= 1) {
+            list.remove(bestIdx);
+        } else {
+            ct.putInt("Count", count - 1);
         }
-        return -1;
+        if (list.isEmpty()) root.remove(KEY_POTION_LIST);
+        else root.put(KEY_POTION_LIST, list);
+        return sample;
     }
 
-    /** Drains all stored potions as ItemStacks (batches of 64). Clears both tiers. */
-    public List<ItemStack> drainHealingPotions() {
+    /** Drains all stored potions as ItemStacks (batches of 64). Used on pet death. */
+    public List<ItemStack> drainPotions() {
         List<ItemStack> out = new ArrayList<>();
-        drainHealingTier(KEY_HEAL_SAMPLE_1, KEY_HEAL_COUNT_1, out);
-        drainHealingTier(KEY_HEAL_SAMPLE_2, KEY_HEAL_COUNT_2, out);
+        Tag t = root.get(KEY_POTION_LIST);
+        if (!(t instanceof ListTag list)) return out;
+        for (Tag entry : list) {
+            if (!(entry instanceof CompoundTag ct)) continue;
+            int count = ct.getIntOr("Count", 0);
+            if (count <= 0) continue;
+            ItemStack sample = readStackFrom(ct, "Sample");
+            if (sample.isEmpty()) continue;
+            while (count > 0) {
+                int batch = Math.min(count, 64);
+                out.add(sample.copyWithCount(batch));
+                count -= batch;
+            }
+        }
+        root.remove(KEY_POTION_LIST);
         return out;
     }
 
-    private void drainHealingTier(String sampleKey, String countKey, List<ItemStack> out) {
-        int count = root.getIntOr(countKey, 0);
-        if (count <= 0) return;
-        ItemStack sample = readStack(sampleKey);
-        root.remove(sampleKey);
-        root.putInt(countKey, 0);
-        if (sample.isEmpty()) return;
-        while (count > 0) {
-            int batch = Math.min(count, 64);
-            out.add(sample.copyWithCount(batch));
-            count -= batch;
+    /** Stable string key for a PotionContents — used to group same-type potions in the map. */
+    private static String potionKey(PotionContents contents) {
+        var namedOpt = contents.potion();
+        if (namedOpt.isPresent()) {
+            var keyOpt = namedOpt.get().unwrapKey();
+            if (keyOpt.isPresent()) return "p:" + keyOpt.get().identifier();
         }
+        // Custom effects fingerprint (no named potion — rare edge case)
+        List<String> parts = new ArrayList<>();
+        for (MobEffectInstance eff : contents.customEffects()) {
+            String effId = eff.getEffect().unwrapKey()
+                .map(k -> k.identifier().toString()).orElse("?");
+            parts.add(effId + ":" + eff.getAmplifier());
+        }
+        parts.sort(String::compareTo);
+        return "c:" + String.join(",", parts);
     }
 
-    public static boolean isHealingPotion(ItemStack stack) {
-        if (stack.isEmpty()) return false;
-        PotionContents contents = stack.get(net.minecraft.core.component.DataComponents.POTION_CONTENTS);
-        if (contents == null) return false;
-        return contents.is(Potions.HEALING) || contents.is(Potions.STRONG_HEALING);
+    private static boolean hasHealingEffect(PotionContents contents) {
+        for (MobEffectInstance eff : contents.getAllEffects()) {
+            if (eff.is(MobEffects.INSTANT_HEALTH) || eff.is(MobEffects.REGENERATION)) return true;
+        }
+        return false;
+    }
+
+    /** Migrates the old 2-tier HealSample/HealCount keys to PotionList. No-op if already migrated. */
+    private void migrateOldHealingSlots() {
+        for (int tier = 1; tier <= 2; tier++) {
+            String sampleKey = "HealSample" + tier;
+            String countKey  = "HealCount" + tier;
+            int count = root.getIntOr(countKey, 0);
+            root.remove(countKey);
+            if (count <= 0) { root.remove(sampleKey); continue; }
+            ItemStack sample = readStack(sampleKey);
+            root.remove(sampleKey);
+            if (!sample.isEmpty()) addPotion(sample.copyWithCount(count));
+        }
     }
 
     // ── Hunger simulation ─────────────────────────────────────────────────
@@ -317,7 +392,11 @@ public final class WeddingRingData {
     // ── Serialization helpers ─────────────────────────────────────────────
 
     private ItemStack readStack(String key) {
-        Tag tag = root.get(key);
+        return readStackFrom(root, key);
+    }
+
+    private ItemStack readStackFrom(CompoundTag src, String key) {
+        Tag tag = src.get(key);
         if (!(tag instanceof CompoundTag ct)) return ItemStack.EMPTY;
         DataResult<ItemStack> result = ItemStack.OPTIONAL_CODEC.parse(
             pet.registryAccess().createSerializationContext(NbtOps.INSTANCE), ct);
@@ -325,12 +404,16 @@ public final class WeddingRingData {
     }
 
     private void writeStack(String key, ItemStack stack) {
+        writeStackTo(root, key, stack);
+    }
+
+    private void writeStackTo(CompoundTag dest, String key, ItemStack stack) {
         if (stack.isEmpty()) {
-            root.remove(key);
+            dest.remove(key);
             return;
         }
         DataResult<Tag> result = ItemStack.OPTIONAL_CODEC.encodeStart(
             pet.registryAccess().createSerializationContext(NbtOps.INSTANCE), stack);
-        result.result().ifPresent(tag -> root.put(key, tag));
+        result.result().ifPresent(tag -> dest.put(key, tag));
     }
 }

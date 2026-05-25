@@ -950,8 +950,7 @@ Added to **all** bound pets:
 |----------|------|---------|
 | `weapon` | Weapon | Any item with `WEAPON` or `TOOL` component, or sword/axe/spear/mace |
 | `shield` | Shield | `minecraft:shield` |
-| `healing` | Healing potions | Instant Health I/II; stored as `{type, count int}` — unlimited count |
-| `food` | Food | Any item with `FOOD` component |
+| `PotionList` | Potions | Any item with `POTION_CONTENTS` component (vanilla + modded); stored as map by type |
 
 Added only to pets **without** existing armor support (i.e., not Wolf which has its own BODY slot):
 
@@ -962,7 +961,9 @@ Added only to pets **without** existing armor support (i.e., not Wolf which has 
 | `armor_legs` | Leg armor | EQUIPPABLE, slot = LEGS |
 | `armor_feet` | Boot armor | EQUIPPABLE, slot = FEET |
 
-**Persistence:** all slots serialized as `CompoundTag` children of `WeddingRingData` in `getPersistentData()`. Healing slot stores `HealingItem` (ResourceLocation) + `HealingCount` (int) separately from the normal ItemStack codec.
+**Standard storage (27 slots):** separate grid below the ring slots. Accepts any item — food goes here and is consumed by the hunger simulation. The feeder also draws from this grid when feeding other pets.
+
+**Persistence:** all slots serialized as `CompoundTag` children of `WeddingRingData` in `getPersistentData()`. Potion slot uses `PotionList` (see §8.7).
 
 **Load hook:** `EntityJoinLevelEvent` (server side). If `WeddingRingData` is present in `getPersistentData()`, re-register combat goals and recalculate attributes.
 
@@ -1054,22 +1055,28 @@ When pet has a shield in the `shield` slot:
 
 ---
 
-### 8.7 Healing Potion Slot
+### 8.7 Potion Slot
 
-Stored as two NBT values in `WeddingRingData`:
-- `HealingItem` (String) — registry ID of the stored potion (`minecraft:potion` with effect `minecraft:instant_health` or `minecraft:instant_health_2`)
-- `HealingCount` (int) — number of potions stored (0 = empty)
+Accepts **any item with a `POTION_CONTENTS` data component** — vanilla Healing I/II, Regeneration, and all modded potions. Not restricted to a specific effect type.
 
-**Auto-use trigger** (checked in `WeddingRingTickHandler.onServerTick`, every 20 ticks per pet):
-- Pet is in combat (`mob.getTarget() != null`) AND `pet.getHealth() < pet.getMaxHealth() * 0.5` AND `HealingCount > 0`.
-- Decrement `HealingCount`. Apply `MobEffectInstance(MobEffects.INSTANT_HEALTH, 1, amplifier)` to the pet (amplifier 0 for Health I, 1 for Health II).
-- Cooldown: 40 ticks between potion uses.
+**NBT storage — `PotionList`** (ListTag in `WeddingRingData`):
+Each entry is a `CompoundTag`:
+- `Key` (String) — stable fingerprint: `"p:<registry-id>"` for named potions (covers all vanilla + most modded), or `"c:<sorted-effect-list>"` for custom-effect potions.
+- `Sample` (CompoundTag) — one ItemStack NBT (used to reconstruct drops on death).
+- `Count` (int) — how many potions of this type are stored.
 
-**GUI slot behavior:**
-- Shows potion item icon with numeric count overlay (vanilla stack count rendering — `ItemStack.setCount(HealingCount)` capped at `Integer.MAX_VALUE` for display; if count > 9999 show "9999+").
-- Shift-click or drag from player inventory adds potions to the count.
-- Right-click takes 1 potion back.
-- Custom `WeddingRingHealingSlot extends Slot` overrides `mayPlace`, `getMaxStackSize`, `onTake`, `onQuickCraft`.
+Different potion types are stored as separate entries. Migration from legacy `HealSample1/HealCount1/HealSample2/HealCount2` keys runs automatically on first load.
+
+**Auto-use trigger** (checked every server tick per pet in `WeddingRingTickHandler`):
+- `pet.getHealth() < pet.getMaxHealth() × 0.5` AND `getTotalPotionCount() > 0` — **no combat requirement**.
+- Cooldown: 40 ticks between uses.
+- Selection: prefers entries that have `INSTANT_HEALTH` or `REGENERATION` in their effects (`hasHealingEffect`); falls back to any stored type.
+- Effect application: `PotionContents.applyToLivingEntity(pet, 1.0f)` — applies all effects at full drink-potion strength.
+
+**GUI slot behavior (`HealingRingSlot`):**
+- Deposit-only — `mayPlace` accepts any potion; `mayPickup` = false; slot always appears empty so more potions can be added.
+- Count displayed as `×N stored` below the slot name.
+- On deposit: `WeddingRingData.addPotion(stack)` groups the stack into the matching `PotionList` entry (or creates a new one).
 
 ---
 
@@ -1094,11 +1101,21 @@ HP regen (mirrors vanilla `FoodData.tick`):
 - Else if foodLevel ≥ 18: regen 1 HP every 80 ticks; FoodTimer = 0.
 - If foodLevel ≤ 0 AND pet.getHealth() > 1: damage 1 HP every 80 ticks.
 
-Food consumption:
-- When not in combat (`mob.getTarget() == null`) AND FoodLevel < 20 AND food slot is non-empty:
-  - Consume 1 item from food slot.
-  - Add `food.nutrition` to FoodLevel (cap 20) and `food.saturationModifier * nutrition * 2` to Saturation (cap 20).
-- If food slot is empty AND FoodLevel ≤ 6: send `WeddingRingCaptionPayload` to owner: `"<pet name> is hungry!"`. Cooldown: 60 seconds.
+Food consumption (self):
+- When not in combat AND `FoodLevel < 16`, once every 80 ticks (staggered by `pet.getId() % 80`):
+  - Scan standard storage slots (27-slot grid) for first item with `FOOD` component.
+  - Consume 1 of that item; add nutrition to FoodLevel and saturation.
+- If no food found AND `FoodLevel ≤ 6`: send `WeddingRingCaptionPayload` to owner: `"<pet name> is hungry!"`. Cooldown: 60 seconds.
+
+**Inter-pet feeding** (runs every 100 ticks when feeder is calm OR has no active combat target):
+- Scan all `OwnableEntity` mobs within 32 blocks owned by the same player (compared via `EntityReference.getUUID()` — works even if player is offline).
+- Select the one with the lowest health ratio below 1.0.
+- If a food item is found in feeder's standard storage:
+  - Call `target.heal(nutrition × 0.5)`.
+  - For ring-bound targets: also restore `FoodLevel` and `Saturation` so hunger drain does not undo the HP gain.
+  - Consume 1 food item from feeder's storage.
+  - Send caption to owner: `"<feeder> fed <target> a <food>"`.
+- Note: feeding is gated on the feeder not actively fighting. Toggle **Calm** mode in the ring GUI to allow feeding while hostile mobs are nearby.
 
 ---
 

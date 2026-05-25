@@ -54,7 +54,9 @@ public class EEClockBlockEntity extends BlockEntity {
         // ZygoteBlock manages its own growth by reading column height directly;
         // accelerating it via this mechanism would cause double-counting.
         if (machineState.getBlock() instanceof ZygoteBlock) return;
-        if (!(machineState.getBlock() instanceof net.minecraft.world.level.block.BaseEntityBlock entityBlock)) return;
+        // Use EntityBlock (interface) not BaseEntityBlock (class) — some mods implement EntityBlock
+        // directly on a plain Block subclass (e.g. Occultism DimensionalMineshaft / Battlefield).
+        if (!(machineState.getBlock() instanceof net.minecraft.world.level.block.EntityBlock entityBlock)) return;
         BlockEntityTicker<BlockEntity> ticker = EEClockBlock.getMachineTicker(level, machineState, entityBlock, machine);
         if (ticker == null) return;
 

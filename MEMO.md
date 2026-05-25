@@ -198,6 +198,16 @@ public void render(GuiGraphics g, int mouseX, int mouseY, float partialTick) {
 
 - **LightingPostBlock** — warding column block, light level 15. No BE logic; reuses `WardingColumnBlockEntity`. Participates in mixed column height. Recipe: glowstone_dust × 4 + warding_post → 4. Dungeon loot weight 3.
 
+## Wedding Ring Potion Storage (§8.7)
+
+`WeddingRingData.PotionList` — ListTag, each entry `{Key:String, Sample:ItemStack, Count:int}`.
+- **Key fingerprint:** `"p:<registry-id>"` for named potions (e.g. `"p:minecraft:healing"`); `"c:<sorted-effect-fingerprint>"` for custom-effect potions.
+- **Accept check:** `WeddingRingData.isPotion(stack)` — any `POTION_CONTENTS != null`.
+- **Use:** `usePotion()` returns sample ItemStack; apply via `PotionContents.applyToLivingEntity(pet, 1.0f)`.
+- **Healing trigger:** `pet.getHealth() < maxHealth * 0.5f` — no combat gate.
+- **Inter-pet feeding:** uses `OwnableEntity.getOwnerReference().getUUID()` (NOT `getOwner().getUUID()`) so it works when the player is offline. Heals HP + restores ring-bound target's FoodLevel/Saturation.
+- **Migration:** old `HealSample1/HealCount1/HealSample2/HealCount2` keys auto-migrated on first `WeddingRingData.get()` call.
+
 ## LLM Companion Patterns (§9)
 
 - **Tool naming matters:** naming tools after output-format concepts (`say`, `think`) causes Qwen3 to write `**[say]** "text"` as plain text instead of making API calls. Keep tools scoped to game actions only. Speech → `"quoted text"` in content; thinking → native Qwen3 `reasoning_content`.

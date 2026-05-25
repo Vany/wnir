@@ -20,7 +20,7 @@ public class HealingRingSlot extends Slot {
         this.data = data;
     }
 
-    @Override public boolean mayPlace(ItemStack stack) { return WeddingRingData.isHealingPotion(stack); }
+    @Override public boolean mayPlace(ItemStack stack) { return WeddingRingData.isPotion(stack); }
 
     // Always report empty so vanilla keeps the slot open for more deposits
     @Override public ItemStack getItem()           { return ItemStack.EMPTY; }
@@ -33,7 +33,7 @@ public class HealingRingSlot extends Slot {
     @Override
     public void set(ItemStack stack) {
         // Vanilla calls set() with whatever the player dropped in; absorb it immediately
-        if (!stack.isEmpty()) data.addHealingPotion(stack);
+        if (!stack.isEmpty()) data.addPotion(stack);
     }
 
     @Override public void onTake(Player player, ItemStack stack) {}

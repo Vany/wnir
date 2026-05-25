@@ -34,11 +34,11 @@ public class WeddingRingScreen extends AbstractContainerScreen<WeddingRingMenu> 
     private static final int VIEWPORT_H   = WeddingRingMenu.VIEWPORT_H;
     private static final int VIEWPORT_TOP = WeddingRingMenu.SLOT_AREA_TOP;
 
-    private static final String[] SLOT_NAMES = {"Weapon", "Shield", "Healing Potions",
+    private static final String[] SLOT_NAMES = {"Weapon", "Shield", "Potions",
                                                  "Helmet", "Chestplate", "Leggings", "Boots"};
     private static final String[] SLOT_DESCS = {"Sword, axe, spear, or mace",
                                                  "Reduces incoming damage",
-                                                 "Instant Health I or II",
+                                                 "Any potion — auto-used when hurt",
                                                  "Head armor", "Chest armor", "Leg armor", "Foot armor"};
 
     private boolean isDraggingScrollbar = false;
@@ -160,11 +160,8 @@ public class WeddingRingScreen extends AbstractContainerScreen<WeddingRingMenu> 
                 String name = i < SLOT_NAMES.length ? SLOT_NAMES[i] : "Slot " + (i + 1);
                 String desc;
                 if (i == 2) {
-                    int c1 = menu.getHealingCount1(), c2 = menu.getHealingCount2();
-                    if (c1 > 0 && c2 > 0) desc = "I×" + c1 + "  II×" + c2;
-                    else if (c1 > 0)       desc = "Healing I ×" + c1;
-                    else if (c2 > 0)       desc = "Healing II ×" + c2;
-                    else                   desc = SLOT_DESCS[2];
+                    int total = menu.getTotalPotionCount();
+                    desc = total > 0 ? "×" + total + " stored" : SLOT_DESCS[2];
                 } else {
                     desc = i < SLOT_DESCS.length ? SLOT_DESCS[i] : "";
                 }

@@ -77,10 +77,10 @@ public class EEClockBlock extends BaseEntityBlock {
         super.affectNeighborsAfterRemoval(state, level, pos, movedByPiston);
     }
 
-    /** Gets the machine's ticker by casting through BaseEntityBlock, capturing the wildcard. */
+    /** Gets the machine's ticker via the EntityBlock interface, capturing the wildcard. */
     @SuppressWarnings("unchecked")
     static <T extends BlockEntity> BlockEntityTicker<T> getMachineTicker(
-        Level level, BlockState state, BaseEntityBlock block, BlockEntity be
+        Level level, BlockState state, net.minecraft.world.level.block.EntityBlock block, BlockEntity be
     ) {
         return block.getTicker(level, state, (BlockEntityType<T>) be.getType());
     }

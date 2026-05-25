@@ -104,6 +104,7 @@ public class SkullBeehiveBlock extends BaseEntityBlock {
             ItemStack stack = new ItemStack(this);
             CompoundTag tag = be.saveCustomOnly(level.registryAccess());
             stack.set(DataComponents.BLOCK_ENTITY_DATA, TypedEntityData.of(be.getType(), tag));
+            sbbe.clearContent();
             ItemEntity entity = new ItemEntity(level, pos.getX() + 0.5, pos.getY() + 0.5, pos.getZ() + 0.5, stack);
             entity.setDefaultPickUpDelay();
             level.addFreshEntity(entity);
@@ -119,10 +120,11 @@ public class SkullBeehiveBlock extends BaseEntityBlock {
         if (level.isClientSide()) return InteractionResult.SUCCESS;
         if (player.isShiftKeyDown()) {
             BlockEntity be = level.getBlockEntity(pos);
-            if (be instanceof SkullBeehiveBlockEntity) {
+            if (be instanceof SkullBeehiveBlockEntity sbbe) {
                 ItemStack stack = new ItemStack(this);
                 CompoundTag tag = be.saveCustomOnly(level.registryAccess());
                 stack.set(DataComponents.BLOCK_ENTITY_DATA, TypedEntityData.of(be.getType(), tag));
+                sbbe.clearContent();
                 level.removeBlock(pos, false);
                 if (!player.getInventory().add(stack)) {
                     // Inventory full — drop at player's feet

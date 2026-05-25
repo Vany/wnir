@@ -293,7 +293,7 @@ public final class WeddingRingLlmTools {
             sb.append("Legs: ").append(stackStr(data.getArmorLegs())).append("\n");
             sb.append("Feet: ").append(stackStr(data.getArmorFeet())).append("\n");
         }
-        sb.append("Healing I: ").append(data.getHealingCount1()).append(", II: ").append(data.getHealingCount2()).append("\n");
+        sb.append("Potions: ").append(data.getTotalPotionCount()).append("\n");
         sb.append("Storage:\n");
         for (int i = 0; i < WeddingRingMenu.STD_SLOT_COUNT; i++) {
             ItemStack s = data.getStdSlot(i);

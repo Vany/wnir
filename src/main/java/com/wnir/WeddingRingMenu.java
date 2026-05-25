@@ -200,10 +200,10 @@ public class WeddingRingMenu extends AbstractContainerMenu {
             false
         ));
 
-        // Healing potion slot — deposit-only; handled via HealingRingSlot
-        defs.add(new SlotDef("Healing Potions", "Instant Health I or II — unlimited storage",
+        // Potion slot — deposit-only; any potion accepted; handled via HealingRingSlot
+        defs.add(new SlotDef("Potions", "Any potion — auto-used when hurt",
             () -> ItemStack.EMPTY, s -> {},
-            WeddingRingData::isHealingPotion,
+            WeddingRingData::isPotion,
             true
         ));
 
@@ -249,13 +249,12 @@ public class WeddingRingMenu extends AbstractContainerMenu {
 
     // ── Accessors ─────────────────────────────────────────────────────────────
 
-    public int getEntityTypeId()    { return data.get(0); }
-    public int getActiveSlotCount() { return data.get(1); }
-    public boolean hasArmor()       { return data.get(2) != 0; }
-    public int getHealingCount1()   { return data.get(3); }
-    public int getHealingCount2()   { return data.get(4); }
-    public boolean isCalm()         { return data.get(5) != 0; }
-    public boolean isAiEnabled()    { return data.get(6) != 0; }
+    public int getEntityTypeId()       { return data.get(0); }
+    public int getActiveSlotCount()    { return data.get(1); }
+    public boolean hasArmor()          { return data.get(2) != 0; }
+    public int getTotalPotionCount()   { return data.get(3); }
+    public boolean isCalm()            { return data.get(5) != 0; }
+    public boolean isAiEnabled()       { return data.get(6) != 0; }
     public List<SlotDef> getSlotDefs() { return slotDefs; }
     public int getScrollOffset()    { return scrollOffset; }
     public void setScrollOffset(int px) { scrollOffset = Math.max(0, px); }
@@ -263,8 +262,8 @@ public class WeddingRingMenu extends AbstractContainerMenu {
     @Override
     public void broadcastChanges() {
         if (ringData != null) {
-            data.set(3, Math.min(ringData.getHealingCount1(), Short.MAX_VALUE));
-            data.set(4, Math.min(ringData.getHealingCount2(), Short.MAX_VALUE));
+            data.set(3, Math.min(ringData.getTotalPotionCount(), Short.MAX_VALUE));
+            data.set(4, 0);
             data.set(5, ringData.isCalm() ? 1 : 0);
             data.set(6, ringData.isAiEnabled() ? 1 : 0);
         }

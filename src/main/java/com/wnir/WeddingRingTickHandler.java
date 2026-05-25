@@ -3,14 +3,12 @@ package com.wnir;
 import net.minecraft.core.component.DataComponents;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
-import net.minecraft.world.effect.MobEffectInstance;
-import net.minecraft.world.effect.MobEffects;
 import net.minecraft.world.entity.Mob;
 import net.minecraft.world.entity.OwnableEntity;
 import net.minecraft.world.entity.item.ItemEntity;
 import net.minecraft.world.food.FoodProperties;
 import net.minecraft.world.item.ItemStack;
-import net.minecraft.world.item.alchemy.Potions;
+import net.minecraft.world.item.alchemy.PotionContents;
 import net.neoforged.neoforge.event.tick.ServerTickEvent;
 
 import java.util.UUID;
@@ -96,17 +94,15 @@ public final class WeddingRingTickHandler {
             }
         }
 
-        // ── Healing potion auto-use ───────────────────────────────────────
+        // ── Potion auto-use ───────────────────────────────────────────────
 
-        if (inCombat
-                && pet.getHealth() < pet.getMaxHealth() * 0.5f
-                && data.getTotalHealingCount() > 0) {
-
+        if (pet.getHealth() < pet.getMaxHealth() * 0.5f && data.getTotalPotionCount() > 0) {
             long lastHeal = pet.getPersistentData().getLongOr("WRHealCooldown", 0L);
             if (gameTime - lastHeal >= HEAL_COOLDOWN_TICKS) {
-                int amplifier = data.useHealingPotion(); // consumes 1; -1 if empty
-                if (amplifier >= 0) {
-                    pet.addEffect(new MobEffectInstance(MobEffects.INSTANT_HEALTH, 1, amplifier));
+                ItemStack used = data.usePotion();
+                if (!used.isEmpty()) {
+                    PotionContents contents = used.get(DataComponents.POTION_CONTENTS);
+                    if (contents != null) contents.applyToLivingEntity(pet, 1.0f);
                     pet.getPersistentData().putLong("WRHealCooldown", gameTime);
                 }
             }
@@ -149,8 +145,9 @@ public final class WeddingRingTickHandler {
                 feeder.getBoundingBox().inflate(32.0))) {
             if (!entity.isAlive() || entity == feeder) continue;
             if (!(entity instanceof OwnableEntity oe)) continue;
-            var petOwner = oe.getOwner();
-            if (petOwner == null || !ownerUUID.equals(petOwner.getUUID())) continue;
+            // Use EntityReference.getUUID() — works even if owner is offline
+            var ref = oe.getOwnerReference();
+            if (ref == null || !ownerUUID.equals(ref.getUUID())) continue;
             float ratio = entity.getHealth() / entity.getMaxHealth();
             if (ratio < 1.0f && ratio < lowestHealthRatio) {
                 lowestHealthRatio = ratio;
@@ -166,8 +163,17 @@ public final class WeddingRingTickHandler {
             FoodProperties food = stack.get(DataComponents.FOOD);
             if (food == null) continue;
 
-            // Directly heal the target (works for any pet, ring-bound or not)
+            // Heal HP — works for any pet
             target.heal(food.nutrition() * 0.5f);
+
+            // For ring-bound targets, also restore food level so hunger sim doesn't drain the HP back
+            WeddingRingData targetData = WeddingRingData.get(target);
+            if (targetData != null) {
+                int newFood = Math.min(20, targetData.getFoodLevel() + food.nutrition());
+                float newSat = Math.min(20, targetData.getSaturation() + food.nutrition() * food.saturation() * 2.0f);
+                targetData.setFoodLevel(newFood);
+                targetData.setSaturation(newSat);
+            }
 
             // Consume one item from the feeder's slot
             feederData.setStdSlot(i, stack.getCount() > 1
@@ -216,8 +222,8 @@ public final class WeddingRingTickHandler {
             dropIfNonEmpty(level, pet, data.getArmorFeet());
         }
 
-        // Drop all stored healing potions
-        for (ItemStack drop : data.drainHealingPotions()) {
+        // Drop all stored potions
+        for (ItemStack drop : data.drainPotions()) {
             level.addFreshEntity(new ItemEntity(level, pet.getX(), pet.getY(), pet.getZ(), drop));
         }
 
