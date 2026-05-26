@@ -19,6 +19,7 @@ All items and blocks show a one-sentence description in their tooltip. Hold **SH
   - [Chunk Loader](#chunk-loader)
   - [Spawner Agitator](#spawner-agitator)
   - [Warding Post](#warding-post)
+  - [Target Post](#target-post)
   - [Teleporter Inhibitor](#teleporter-inhibitor)
   - [EE Clock](#ee-clock)
   - [EE Clock Budding Crystal](#ee-clock-budding-crystal)
@@ -92,6 +93,36 @@ Column block that pushes hostile mobs outward. Stack posts to increase radius.
 | **Tool** | Pickaxe |
 
 Can be mixed with Teleporter Inhibitor blocks in a single column — the combined column height counts toward both effects.
+
+---
+
+### Target Post
+
+A warding-column block that attacks mobs within the column's radius. When named, it targets a specific mob type — including passive mobs.
+
+| | |
+|---|---|
+| **Damage** | 1♥ per Target Post in column every 4 ticks (armor-bypassing magic damage) |
+| **Unnamed** | Attacks all hostile mobs in range (same as Hurt Post) |
+| **Named** | Name the post after a mob type (e.g. `Cow`, `Zombie`, `Villager`). Only that mob type takes damage — hostile or not |
+| **Copy name** | Right-click any mob while holding a Target Post item → the item is instantly named after that mob's type |
+| **Multiple filters** | Stack named posts in one column — each adds its type to the filter; all listed types are hit |
+| **Radius** | Determined by other column blocks (warding posts, etc.); Target Post adds no radius of its own |
+| **Recipe** | Warding Post + Target block (shapeless) |
+| **Tool** | Pickaxe |
+
+**Workflow:** hold a Target Post → right-click a Cow → item becomes `Cow` → place it → all cows in range take damage every 4 ticks.
+
+**Examples:**
+
+| Name | Effect |
+|------|--------|
+| *(none)* | Damages all hostiles |
+| `Cow` | Damages all cows |
+| `Zombie` | Damages all zombies |
+| One post `Cow` + one post `Zombie` | Damages both cows and zombies |
+
+> Name matching is case-insensitive (`cow` and `Cow` both work).
 
 ---
 
@@ -616,7 +647,7 @@ make jar        # Build and print jar path
 make setup      # Initialize Gradle wrapper (8.14)
 ```
 
-Output: `build/libs/wnir-26.1.2-1.0.0.jar`
+Output: `build/libs/wnir-26.1.2-1.0.3.jar`
 
 **Requirements:** Java 21, NeoForge 26.1.2-beta, Minecraft 26.1.2.
 

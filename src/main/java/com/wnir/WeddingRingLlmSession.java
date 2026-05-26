@@ -159,6 +159,21 @@ public final class WeddingRingLlmSession {
             shortId, messages.size(), sysMsgs, histMsgs,
             messages.stream().mapToInt(WeddingRingLlmContext::msgTokens).sum());
 
+        // Passive ticks don't need thinking; append /no_think so Qwen3 skips the reasoning chain.
+        boolean isTick = triggerText.startsWith("[Tick]");
+        if (isTick) {
+            for (int i = messages.size() - 1; i >= 0; i--) {
+                if ("user".equals(messages.get(i).get("role"))) {
+                    Map<String, Object> patched = new java.util.HashMap<>(messages.get(i));
+                    patched.put("content", patched.get("content") + " /no_think");
+                    messages.set(i, patched);
+                    break;
+                }
+            }
+        }
+        int tickMaxTokens = 256; // short cap for passive ticks — model already has world state
+        int maxTokens = isTick ? tickMaxTokens : WeddingRingLlmConfig.maxResponseTokens;
+
         // Accumulates tool-call turns so they're saved to history alongside the final response.
         List<Map<String, Object>> newTurns = new ArrayList<>();
 
@@ -166,10 +181,10 @@ public final class WeddingRingLlmSession {
         for (int round = 0; round < maxRounds; round++) {
             WeddingRingLlmClient.CompletionResult result =
                 WeddingRingLlmClient.complete(messages, TOOLS, "auto",
-                    WeddingRingLlmConfig.maxResponseTokens, "pet:" + shortId + " R" + (round + 1));
+                    maxTokens, "pet:" + shortId + " R" + (round + 1));
             WnirMod.LOGGER.info("[LlmSession:{}] round {}: finish={}", shortId, round + 1, result.finishReason());
 
-            if (result.isToolCall() && !result.toolCalls().isEmpty()) {
+            if (!result.toolCalls().isEmpty()) { // check tool calls first — finish_reason may lag behind
                 particleState = ParticleState.TOOL_BURST;
                 burstTicksLeft = 2;
 
@@ -214,6 +229,10 @@ public final class WeddingRingLlmSession {
                         WeddingRingData d = WeddingRingData.get(p);
                         if (d == null) return;
 
+                        boolean fighting = p.getTarget() != null;
+
+                        // Speech (yellow chat): always show — player may have chatted during combat.
+                        // Narration (HUD): suppress during combat to avoid noise.
                         for (String line : finalSpeech) {
                             String msg = p.getDisplayName().getString() + ": " + line;
                             server.getPlayerList().broadcastSystemMessage(
@@ -221,7 +240,7 @@ public final class WeddingRingLlmSession {
                                     .withStyle(net.minecraft.ChatFormatting.YELLOW), false);
                         }
 
-                        if (!finalNarration.isBlank()) {
+                        if (!fighting && !finalNarration.isBlank()) {
                             net.minecraft.server.level.ServerPlayer owner =
                                 p.level().getServer().getPlayerList().getPlayer(d.getOwnerUUID());
                             if (owner != null) {

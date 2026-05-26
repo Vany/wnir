@@ -130,9 +130,10 @@ No tests exist. `make test` runs `./gradlew test` but there are no test sources.
 ### Warding column system
 - **WardingColumnBlock** — marker interface implemented by `WardingPostBlock` and `TeleporterInhibitorBlock`
 - **WardingColumnBaseBlock** — shared base class for column blocks
-- **WardingColumnBlockEntity** — shared base block entity with column height caching
+- **WardingColumnBlockEntity** — shared base block entity with column height caching; holds `targetName` (per-block filter from anvil rename), `targetPostCount`, `targetFilters` (union of names, computed by bottom BE)
 - **ColumnHelper** — mixed-column traversal utilities (`countBelow`, `forEachInMixedColumn`, etc.)
 - **WardingPostTeleportHandler** — scans for warding column blocks, cancels `EntityTeleportEvent`
+- **TargetPostBlock** — warding column block; unnamed = damages all hostiles every 4 ticks; named = damages any mob of that entity type (hostile or passive); right-click mob with item → stamps entity type name onto item; name persists through break/place via `BlockDropsEvent`; craftable: warding_post + target (shapeless)
 
 ### Mob effects & handlers (all beneficial marker effects)
 - **MartialLightningHandler** — Melee combat: damage multiplier + AoE by weapon tier

@@ -56,6 +56,8 @@ public class WnirMod {
         NeoForge.EVENT_BUS.addListener(AccelerateHandler::onEntityJoinLevel);
         NeoForge.EVENT_BUS.addListener(ToughnessHandler::onPlayerTick);
         NeoForge.EVENT_BUS.addListener(OverCrookingHandler::onBlockDrops);
+        NeoForge.EVENT_BUS.addListener(TargetPostBlock::onBlockDrops);
+        NeoForge.EVENT_BUS.addListener(TargetPostBlock::onEntityInteract);
         NeoForge.EVENT_BUS.addListener(MouseyCompassItem::onPlayerTick);
         NeoForge.EVENT_BUS.addListener(WeddingRingItem::onLivingDeath);
         NeoForge.EVENT_BUS.addListener(WeddingRingTargetGoal::onMobTargetsPet);
@@ -219,6 +221,10 @@ public class WnirMod {
     private void onBlockPlaced(BlockEvent.EntityPlaceEvent event) {
         if (!(event.getLevel() instanceof ServerLevel level)) return;
         ZygoteBlock.tryTransformAt(level, event.getPos());
+        if (event.getState().getBlock() instanceof TargetPostBlock
+                && event.getEntity() instanceof net.minecraft.world.entity.player.Player player) {
+            TargetPostBlock.onEntityPlace(level, event.getPos(), player);
+        }
     }
 
     private void onRegisterBrewingRecipes(RegisterBrewingRecipesEvent event) {

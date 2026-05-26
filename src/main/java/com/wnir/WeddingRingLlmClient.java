@@ -98,6 +98,10 @@ public final class WeddingRingLlmClient {
         body.addProperty("max_tokens", maxTokens);
         body.addProperty("stream", true);
         body.add("messages", GSON.toJsonTree(messages));
+        // Cap Qwen3 thinking chain to avoid [LENGTH] truncation
+        JsonObject thinkingKwargs = new JsonObject();
+        thinkingKwargs.addProperty("thinking_budget", WeddingRingLlmConfig.thinkingBudget);
+        body.add("chat_template_kwargs", thinkingKwargs);
         if (tools != null && !tools.isEmpty()) {
             body.add("tools", tools);
             body.addProperty("tool_choice", toolChoice != null ? toolChoice : "auto");
@@ -252,17 +256,20 @@ public final class WeddingRingLlmClient {
             mergeProps(xyzProps("Container position"),
                 prop("item_name", "string", "Item registry path"),
                 prop("count", "integer", "Number to transfer"))));
-        arr.add(buildTool("goto", "Navigate the pet to coordinates",
+        arr.add(buildTool("goto", "Start navigating the pet toward coordinates. Returns current position. Navigation is async — the pet starts moving but has not arrived yet; do not call place in the same round.",
             xyzProps("Destination coordinates")));
         arr.add(buildTool("stats", "Get all character attributes and current status", new JsonObject()));
         arr.add(buildTool("equip",
             "Move an item from pet storage into its appropriate equipment slot (weapon, shield, or armor). " +
             "Returns 'broken: ...' if the item has zero durability.",
             prop("item_name", "string", "Registry path of the item to equip, e.g. minecraft:diamond_sword")));
-        arr.add(buildTool("place", "Place a block from pet storage at the given coordinates. Returns 'error: too far' if out of range.",
+        arr.add(buildTool("place", "Place a block from pet storage at the given coordinates. If too far, automatically starts navigating and returns 'navigating...call place again next round'.",
             mergeProps(
                 prop("item_name", "string", "Registry path of the block item to place, e.g. minecraft:dirt"),
                 xyzProps("Target position to place the block"))));
+        arr.add(buildTool("recall",
+            "Return your last 5 responses from conversation history. Call this when you notice you might be repeating the same concern or action.",
+            new JsonObject()));
         return arr;
     }
 
@@ -273,6 +280,12 @@ public final class WeddingRingLlmClient {
         JsonObject params = new JsonObject();
         params.addProperty("type", "object");
         params.add("properties", properties);
+        // required array — OpenAI spec requires this for all defined params so Qwen3 doesn't omit them
+        if (properties.size() > 0) {
+            JsonArray required = new JsonArray();
+            for (String key : properties.keySet()) required.add(key);
+            params.add("required", required);
+        }
         fn.add("parameters", params);
 
         JsonObject tool = new JsonObject();

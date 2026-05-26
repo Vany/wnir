@@ -75,25 +75,29 @@ public final class WeddingRingLlmTools {
         try { args = JsonParser.parseString(argsJson).getAsJsonObject(); }
         catch (Exception e) { args = new JsonObject(); }
 
+        boolean inCombat = pet.getTarget() != null;
+
         return switch (toolName) {
             case "say"       -> toolSay(server, pet, data, args);
             case "remember"  -> toolRemember(data, args);
             case "plan"      -> toolPlan(data, args);
             case "todo"      -> toolTodo(data);
+            case "done"      -> toolDone(data, args);
+            case "recall"    -> toolRecall(data);
             case "item_info" -> toolItemInfo(args);
-            case "craft"     -> toolCraft(pet, data, args);
             case "nearest"   -> toolNearest(pet, args);
             case "inspect"   -> toolInspect(pet, args);
             case "inventory" -> toolInventory(pet, data);
-            case "put"       -> toolPut(pet, data, args);
-            case "get"       -> toolGet(pet, data, args);
-            case "goto"      -> toolGoto(pet, args);
             case "stats"     -> toolStats(pet, data);
-            case "equip"     -> toolEquip(pet, data, args);
-            case "place"     -> toolPlace(pet, data, args);
-            case "done"      -> toolDone(data, args);
             case "think"     -> "ok";
-            default          -> "error: unknown tool " + toolName;
+            // Action tools: blocked while pet is fighting
+            case "goto"   -> inCombat ? "in combat — movement skipped" : toolGoto(pet, args);
+            case "place"  -> inCombat ? "in combat — placement skipped" : toolPlace(pet, data, args);
+            case "equip"  -> inCombat ? "in combat — equip skipped" : toolEquip(pet, data, args);
+            case "craft"  -> inCombat ? "in combat — crafting skipped" : toolCraft(pet, data, args);
+            case "put"    -> inCombat ? "in combat — transfer skipped" : toolPut(pet, data, args);
+            case "get"    -> inCombat ? "in combat — transfer skipped" : toolGet(pet, data, args);
+            default       -> "error: unknown tool " + toolName;
         };
     }
 
@@ -142,6 +146,27 @@ public final class WeddingRingLlmTools {
         StringBuilder sb = new StringBuilder();
         for (int i = 0; i < todo.size(); i++) {
             sb.append(i + 1).append(". ").append(todo.get(i)).append("\n");
+        }
+        return sb.toString().trim();
+    }
+
+    private static String toolRecall(WeddingRingData data) {
+        List<Map<String, Object>> history = data.getLlmHistory();
+        List<String> recent = new ArrayList<>();
+        for (int i = history.size() - 1; i >= 0 && recent.size() < 5; i--) {
+            Map<String, Object> msg = history.get(i);
+            if ("assistant".equals(msg.get("role"))) {
+                Object content = msg.get("content");
+                if (content instanceof String s && !s.isBlank()) {
+                    String trimmed = s.length() > 200 ? s.substring(0, 200) + "…" : s;
+                    recent.add(0, trimmed);
+                }
+            }
+        }
+        if (recent.isEmpty()) return "no previous responses";
+        StringBuilder sb = new StringBuilder();
+        for (int i = 0; i < recent.size(); i++) {
+            sb.append(i + 1).append(". ").append(recent.get(i)).append("\n");
         }
         return sb.toString().trim();
     }
@@ -378,6 +403,7 @@ public final class WeddingRingLlmTools {
 
     private static String toolStats(Mob pet, WeddingRingData data) {
         StringBuilder sb = new StringBuilder();
+        sb.append("Position: ").append((int)pet.getX()).append(" ").append((int)pet.getY()).append(" ").append((int)pet.getZ()).append("\n");
         sb.append("Health: ").append(String.format("%.1f/%.1f", pet.getHealth(), pet.getMaxHealth())).append("\n");
         sb.append("Hunger: ").append(data.getFoodLevel()).append("/20\n");
         appendAttr(sb, "Max health",          pet, Attributes.MAX_HEALTH);
@@ -477,8 +503,12 @@ public final class WeddingRingLlmTools {
     private static String toolPlace(Mob pet, WeddingRingData data, JsonObject args) {
         BlockPos pos = blockPosArg(args);
         if (pos == null) return "error: x, y, z required";
-        if (pet.blockPosition().distSqr(pos) > TOOL_RANGE * TOOL_RANGE)
-            return "error: too far";
+        if (pet.blockPosition().distSqr(pos) > TOOL_RANGE * TOOL_RANGE) {
+            boolean nav = pet.getNavigation().moveTo(pos.getX() + 0.5, pos.getY(), pos.getZ() + 0.5, 1.0);
+            String here = posStr(pet.blockPosition());
+            return nav ? "navigating from " + here + " → " + posStr(pos) + "; call place again next round"
+                       : "error: unreachable (I'm at " + here + ")";
+        }
 
         String itemName = stringArg(args, "item_name", "");
         if (itemName.isEmpty()) return "error: item_name required";
@@ -506,8 +536,10 @@ public final class WeddingRingLlmTools {
         int z = intArg(args, "z", Integer.MIN_VALUE);
         if (x == Integer.MIN_VALUE || y == Integer.MIN_VALUE || z == Integer.MIN_VALUE)
             return "error: x, y, z required";
+        String here = posStr(pet.blockPosition());
         boolean ok = pet.getNavigation().moveTo(x + 0.5, y, z + 0.5, 1.0);
-        return ok ? "moving" : "unreachable";
+        return ok ? "moving from " + here + " → " + x + " " + y + " " + z
+                  : "unreachable (I'm at " + here + ")";
     }
 
     // ── Helpers ──────────────────────────────────────────────────────────────

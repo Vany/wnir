@@ -92,12 +92,13 @@ All post blocks share a single `WardingColumnBlockEntity`. The **bottom** block 
 | `hurt_post` | **+0** | Magic damage to enemies: `1♥ × hurtPostCount` every 4 ticks. No radius contribution. |
 | `silencer_post` | +4 | Attenuates entity sounds to 10% within a **sphere** of `totalRadius` |
 | `reshaper_post` | **÷2** per post | Halves total radius each post; adds +1 vertical reach up and down per post |
+| `target_post` | **+0** | Magic damage to enemies: `1♥ × targetPostCount` every 4 ticks. Optional type filter from anvil name. No radius contribution. Craftable. |
 
 All types mix freely in one column. Column events on every block type: `onPlace` → `notifyColumn`, `playerWillDestroy` → `notifyColumnExcluding`, `randomTick` → `notifyColumn`, `onLoad` (BE) → `recalcColumn`.
 
 **Tick:** bottom BE only. Every 4 ticks. Vertical range ±2.5 blocks. Push strength 0.5, upward 0.1.
 
-**Acquisition:** all posts are loot-only — jungle temples, desert pyramids, strongholds, mineshafts, simple dungeons. Weight 3 each.
+**Acquisition:** most posts are loot-only — jungle temples, desert pyramids, strongholds, mineshafts, simple dungeons. Weight 3 each. `target_post` is craftable (warding_post + target block, shapeless).
 
 ---
 
@@ -152,6 +153,33 @@ Trades horizontal radius for vertical reach. Each post in the column **halves** 
 **Vertical:** `extraVertical = RESHAPER_VERTICAL_BONUS × reshaperCount` added to the base `VERTICAL_RANGE = 2.5`.
 
 **Acquisition:** loot-only. Craft: Warding Post + Obsidian.
+
+---
+
+### Target Post (`wnir:target_post`)
+
+Deals armor-bypassing magic damage to mobs in column radius every 4 ticks, with optional per-type filtering. Targets any mob type (hostile or passive) when named.
+
+**Damage:** `HURT_DAMAGE (2.0f) × targetPostCount` HP per tick cycle, same formula as HurtPost. Attributed to column installer via `indirectMagic` damage source so mobs drop full loot.
+
+**Naming workflow:** right-click any mob while holding a Target Post item → `PlayerInteractEvent.EntityInteract` handler sets `DataComponents.CUSTOM_NAME` to the mob's entity-type path (e.g. `"Cow"`, `"Zombie"`). Place the post → `BlockEvent.EntityPlaceEvent` reads the name and sets `be.targetName`; calls `notifyColumn` to rebuild `targetFilters` immediately.
+
+**Filter logic:**
+- Each `TargetPostBlock` BE stores a `targetName` string in NBT (`"target_name"` key). Set via `onEntityPlace` from `BlockEvent.EntityPlaceEvent` (fires while player still holds unconsumed item). Stored lowercase.
+- Bottom BE `recalcColumn()` collects all non-empty `targetName` values from TargetPost BEs into `targetFilters: Set<String>`.
+- Empty `targetFilters` (all posts unnamed) → attack all `Enemy` implementors.
+- Non-empty → attack **any** `Mob` (not restricted to `Enemy`) whose `BuiltInRegistries.ENTITY_TYPE.getKey(type).getPath()` (lowercased) is in the set.
+- Multiple named posts: union of names. Unnamed posts do NOT widen the filter when named posts exist.
+- `BlockDropsEvent` handler restores `CUSTOM_NAME` on the dropped item from `be.targetName` so the name survives break–replace cycles.
+
+**Implementation:**
+- `targetName` and `targetPostCount` / `targetFilters` live on `WardingColumnBlockEntity` (shared BE).
+- `serverTick` early-return: `if (!hasRepel && hurtPostCount == 0 && targetPostCount == 0) return`.
+- `targetName` persisted in NBT as `"target_name"` string.
+
+**Recipe:** shapeless — `wnir:warding_post` + `minecraft:target` → 1 target post.
+
+**Acquisition:** craftable.
 
 ---
 

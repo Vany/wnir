@@ -308,6 +308,15 @@ public final class WnirRegistries {
                 .noOcclusion()
                 .randomTicks());
 
+    private static final SimpleBlockBundle<TargetPostBlock> TARGET_POST =
+        registerSimpleBlock("target_post", TargetPostBlock::new,
+            BlockBehaviour.Properties.of()
+                .mapColor(MapColor.COLOR_RED)
+                .sound(SoundType.WOOL)
+                .strength(0.1f)
+                .noOcclusion()
+                .randomTicks());
+
     /** Single shared BE type for all warding column blocks. */
     private static final Supplier<BlockEntityType<WardingColumnBlockEntity>> WARDING_COLUMN_BE =
         BLOCK_ENTITIES.register("warding_column", () -> {
@@ -318,7 +327,8 @@ public final class WnirRegistries {
                 LIGHTING_POST.block.get(),
                 HURT_POST.block.get(),
                 SILENCER_POST.block.get(),
-                RESHAPER_POST.block.get()
+                RESHAPER_POST.block.get(),
+                TARGET_POST.block.get()
             );
             return new BlockEntityType<>(WardingColumnBlockEntity::create, blocks);
         });

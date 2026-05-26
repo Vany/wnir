@@ -26,6 +26,7 @@ public final class WeddingRingTickHandler {
     private WeddingRingTickHandler() {}
 
     public static void onServerTick(ServerTickEvent.Post event) {
+        WeddingRingAttackHandler.tickScans(event.getServer());
         for (ServerLevel level : event.getServer().getAllLevels()) {
             level.getEntities().getAll().forEach(entity -> {
                 if (entity instanceof Mob mob && mob.isAlive()) {

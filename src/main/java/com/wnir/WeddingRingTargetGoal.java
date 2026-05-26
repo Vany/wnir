@@ -82,6 +82,7 @@ public class WeddingRingTargetGoal extends TargetGoal {
         AABB box = pet.getBoundingBox().inflate(scanRadius);
         List<LivingEntity> enemies = level.getEntitiesOfClass(LivingEntity.class, box,
             e -> e instanceof Enemy && e.isAlive()
+                && !(e instanceof net.minecraft.world.entity.NeutralMob nm && !nm.isAngry())
                 && !(e instanceof OwnableEntity oe && oe.getOwner() != null)
                 && !WeddingRingTargetFilter.isBlacklisted(petUUID, e.getUUID(), gameTime));
 

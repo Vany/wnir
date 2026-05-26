@@ -185,7 +185,11 @@ public class WeddingRingSpearGoal extends Goal {
         if (data == null) return 20;
         KineticWeapon kw = data.getWeapon().get(DataComponents.KINETIC_WEAPON);
         if (kw == null) return 20;
-        return Goal.reducedTickDelay(kw.computeDamageUseDuration());
+        int base = Goal.reducedTickDelay(kw.computeDamageUseDuration());
+        int ss = WnirEnchantments.getLevel(data.getWeapon(), SwiftStrikeHandler.KEY);
+        if (ss <= 0) return base;
+        double mult = 1.0 + SwiftStrikeHandler.MULT[Math.min(ss, 3) - 1];
+        return Math.max(1, (int)(base / mult));
     }
 
     private boolean isOwnerInRange() {

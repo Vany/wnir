@@ -40,6 +40,16 @@ public class WeddingRingMeleeGoal extends MeleeAttackGoal {
         return isOwnerInRange() && super.canContinueToUse();
     }
 
+    @Override
+    protected int getAttackInterval() {
+        WeddingRingData data = WeddingRingData.get(pet);
+        if (data == null) return 20;
+        int ss = WnirEnchantments.getLevel(data.getWeapon(), SwiftStrikeHandler.KEY);
+        if (ss <= 0) return 20;
+        double mult = 1.0 + SwiftStrikeHandler.MULT[Math.min(ss, 3) - 1];
+        return Math.max(1, (int)(20.0 / mult));
+    }
+
     private boolean isOwnerInRange() {
         WeddingRingData data = WeddingRingData.get(pet);
         if (data == null) return false;

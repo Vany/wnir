@@ -1,0 +1,12 @@
+{
+  "type": "minecraft:crafting_shapeless",
+  "category": "misc",
+  "ingredients": [
+    "wnir:warding_post",
+    "minecraft:target"
+  ],
+  "result": {
+    "id": "wnir:target_post",
+    "count": 1
+  }
+}

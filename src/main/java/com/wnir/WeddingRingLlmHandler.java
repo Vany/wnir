@@ -181,7 +181,10 @@ public final class WeddingRingLlmHandler {
             hostileStr = "%d (closest: %s)".formatted(hostiles.size(), closestStr);
         }
 
+        String pos = "My position: " + (int)pet.getX() + " " + (int)pet.getY() + " " + (int)pet.getZ();
+
         java.util.List<String> facts = new java.util.ArrayList<>(java.util.List.of(
+            pos,
             "Distance to owner: " + ownerInfo,
             "Health: " + health + "  |  Hunger: " + hunger,
             "Time: " + timeStr,

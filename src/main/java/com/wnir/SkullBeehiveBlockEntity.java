@@ -408,9 +408,11 @@ public class SkullBeehiveBlockEntity extends RandomizableContainerBlockEntity im
 
     // ── Targeting ────────────────────────────────────────────────────────────
 
-    /** Returns true if the mob is a valid turret target: implements Enemy but is not an Enderman. */
+    /** Returns true if the mob is a valid turret target: implements Enemy, is not an Enderman,
+     *  and is not a neutral mob that hasn't been provoked yet. */
     private static boolean isValidTarget(Mob m) {
         if (m instanceof net.minecraft.world.entity.monster.EnderMan) return false;
+        if (m instanceof net.minecraft.world.entity.NeutralMob nm && !nm.isAngry()) return false;
         return m instanceof Enemy;
     }
 

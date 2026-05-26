@@ -20,10 +20,12 @@ import java.util.List;
  */
 public final class WeddingRingAttributeManager {
 
-    private static final Identifier ID_ARMOR         = Identifier.fromNamespaceAndPath(WnirMod.MOD_ID, "wedding_ring/armor");
-    private static final Identifier ID_TOUGHNESS     = Identifier.fromNamespaceAndPath(WnirMod.MOD_ID, "wedding_ring/toughness");
-    private static final Identifier ID_ATTACK_DAMAGE = Identifier.fromNamespaceAndPath(WnirMod.MOD_ID, "wedding_ring/attack_damage");
-    private static final Identifier ID_PROT_ARMOR    = Identifier.fromNamespaceAndPath(WnirMod.MOD_ID, "wedding_ring/prot_armor");
+    private static final Identifier ID_ARMOR          = Identifier.fromNamespaceAndPath(WnirMod.MOD_ID, "wedding_ring/armor");
+    private static final Identifier ID_TOUGHNESS      = Identifier.fromNamespaceAndPath(WnirMod.MOD_ID, "wedding_ring/toughness");
+    private static final Identifier ID_TOUGHNESS_ENCH = Identifier.fromNamespaceAndPath(WnirMod.MOD_ID, "wedding_ring/toughness_ench");
+    private static final Identifier ID_ATTACK_DAMAGE  = Identifier.fromNamespaceAndPath(WnirMod.MOD_ID, "wedding_ring/attack_damage");
+    private static final Identifier ID_PROT_ARMOR     = Identifier.fromNamespaceAndPath(WnirMod.MOD_ID, "wedding_ring/prot_armor");
+    private static final Identifier ID_ATTACK_SPEED   = Identifier.fromNamespaceAndPath(WnirMod.MOD_ID, "wedding_ring/attack_speed");
 
     private WeddingRingAttributeManager() {}
 
@@ -35,9 +37,10 @@ public final class WeddingRingAttributeManager {
 
         if (data == null) return;
 
-        double armor    = 0;
-        double toughness = 0;
-        int    totalProt = 0;
+        double armor        = 0;
+        double toughness    = 0;
+        int    totalProt    = 0;
+        int    toughnessEnch = 0;
 
         // Armor pieces
         List<ItemStack> armorPieces;
@@ -64,9 +67,8 @@ public final class WeddingRingAttributeManager {
 
                 // Enchantments: protection
                 totalProt += enchLevel(pet, piece, Enchantments.PROTECTION);
-                // Toughness enchantment (from our custom enchantment)
-                // Our custom wnir:toughness enchant modifies ARMOR_TOUGHNESS — but that's handled
-                // by the enchantment system directly; skip custom enchant here unless desired.
+                // wnir:toughness — player handler only fires for players, so apply manually here
+                toughnessEnch += WnirEnchantments.getLevel(piece, ToughnessHandler.KEY);
             }
         }
 
@@ -82,6 +84,8 @@ public final class WeddingRingAttributeManager {
             weaponDmg = dmgSum[0];
             sharpness = enchLevel(pet, weapon, Enchantments.SHARPNESS);
         }
+
+        int swiftStrike = weapon.isEmpty() ? 0 : WnirEnchantments.getLevel(weapon, SwiftStrikeHandler.KEY);
 
         // Apply modifiers
         if (armor > 0) {
@@ -99,6 +103,13 @@ public final class WeddingRingAttributeManager {
             double protArmor = Math.min(totalProt * 0.5, 20.0);
             applyModifier(pet, Attributes.ARMOR, ID_PROT_ARMOR, protArmor, AttributeModifier.Operation.ADD_VALUE);
         }
+        if (toughnessEnch > 0) {
+            applyModifier(pet, Attributes.ARMOR_TOUGHNESS, ID_TOUGHNESS_ENCH, toughnessEnch, AttributeModifier.Operation.ADD_VALUE);
+        }
+        if (swiftStrike > 0) {
+            double mult = SwiftStrikeHandler.MULT[Math.min(swiftStrike, 3) - 1];
+            applyModifier(pet, Attributes.ATTACK_SPEED, ID_ATTACK_SPEED, mult, AttributeModifier.Operation.ADD_MULTIPLIED_TOTAL);
+        }
 
         // Physical copy in MAINHAND so startUsingItem / doHurtTarget mechanics work
         ItemStack handItem = (data != null && !data.getWeapon().isEmpty())
@@ -107,14 +118,11 @@ public final class WeddingRingAttributeManager {
     }
 
     private static void removeAll(Mob pet) {
-        for (Holder<Attribute> attrHolder : List.of(Attributes.ARMOR, Attributes.ARMOR_TOUGHNESS, Attributes.ATTACK_DAMAGE)) {
+        Identifier[] allIds = { ID_ARMOR, ID_TOUGHNESS, ID_TOUGHNESS_ENCH, ID_ATTACK_DAMAGE, ID_PROT_ARMOR, ID_ATTACK_SPEED };
+        for (Holder<Attribute> attrHolder : List.of(Attributes.ARMOR, Attributes.ARMOR_TOUGHNESS, Attributes.ATTACK_DAMAGE, Attributes.ATTACK_SPEED)) {
             var inst = pet.getAttribute(attrHolder);
-            if (inst != null) {
-                inst.removeModifier(ID_ARMOR);
-                inst.removeModifier(ID_TOUGHNESS);
-                inst.removeModifier(ID_ATTACK_DAMAGE);
-                inst.removeModifier(ID_PROT_ARMOR);
-            }
+            if (inst == null) continue;
+            for (Identifier id : allIds) inst.removeModifier(id);
         }
     }
 

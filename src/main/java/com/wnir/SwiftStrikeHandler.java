@@ -27,7 +27,7 @@ public final class SwiftStrikeHandler {
     private static final Identifier MODIFIER_ID =
         WnirRegistries.id("swift_strike");
 
-    private static final double[] MULT = { 1.0 / 3.0, 1.0, 3.0 };
+    static final double[] MULT = { 1.0 / 3.0, 1.0, 3.0 };
 
     private SwiftStrikeHandler() {}
 

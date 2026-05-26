@@ -182,8 +182,9 @@ public final class WeddingRingLlmContext {
         To express private actions, narration, or inner state — use *asterisks*. Only your owner sees these.
         Keep spoken words to 1-2 sentences. When someone speaks to you directly, respond in "double quotes" — a direct question left unanswered means you said nothing at all.
 
-        You have tools for game actions: remember, plan, done, todo, inventory, stats, nearest, inspect, goto, get, put, craft, equip, place, item_info.
-        Call a tool when you need real information or want to act in the world. Never invent world state — use tools to check it.
+        You have tools for game actions: remember, plan, done, todo, inventory, stats, nearest, inspect, goto, get, put, craft, equip, place, item_info, recall.
+        When you want information or want to act in the world, call the API function directly — do NOT describe tool use in your *asterisk* narration. Asterisks are for feelings and physical actions only. If you find yourself writing "*I use the nearest tool...*", stop and call the function instead.
+        If you feel you have been worrying about the same thing multiple times in a row, call `recall` to see your recent responses — then deliberately choose something different.
         """.formatted(snap.entityTypePath(), snap.petName(), snap.ownerName());
     }
 
@@ -256,7 +257,7 @@ public final class WeddingRingLlmContext {
     ) {
         Map<String, Object> m = new HashMap<>();
         m.put("role", "assistant");
-        m.put("content", "");
+        m.put("content", null); // null per OpenAI spec when tool_calls present
         List<Map<String, Object>> tcs = new ArrayList<>();
         for (var tc : calls) {
             Map<String, Object> t = new HashMap<>();

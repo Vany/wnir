@@ -11,6 +11,7 @@ import net.minecraft.world.entity.item.ItemEntity;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.entity.projectile.arrow.AbstractArrow;
 import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.component.ItemContainerContents;
 import net.minecraft.world.item.component.TypedEntityData;
 import net.minecraft.world.level.BlockGetter;
 import net.minecraft.world.level.Level;
@@ -104,6 +105,7 @@ public class SkullBeehiveBlock extends BaseEntityBlock {
             ItemStack stack = new ItemStack(this);
             CompoundTag tag = be.saveCustomOnly(level.registryAccess());
             stack.set(DataComponents.BLOCK_ENTITY_DATA, TypedEntityData.of(be.getType(), tag));
+            stack.set(DataComponents.CONTAINER, ItemContainerContents.fromItems(sbbe.getItems()));
             sbbe.clearContent();
             ItemEntity entity = new ItemEntity(level, pos.getX() + 0.5, pos.getY() + 0.5, pos.getZ() + 0.5, stack);
             entity.setDefaultPickUpDelay();
@@ -124,6 +126,7 @@ public class SkullBeehiveBlock extends BaseEntityBlock {
                 ItemStack stack = new ItemStack(this);
                 CompoundTag tag = be.saveCustomOnly(level.registryAccess());
                 stack.set(DataComponents.BLOCK_ENTITY_DATA, TypedEntityData.of(be.getType(), tag));
+                stack.set(DataComponents.CONTAINER, ItemContainerContents.fromItems(sbbe.getItems()));
                 sbbe.clearContent();
                 level.removeBlock(pos, false);
                 if (!player.getInventory().add(stack)) {

@@ -21,6 +21,7 @@
     "wnir:reshaper_post",
     "wnir:wither_silencer",
     "wnir:trader",
-    "wnir:opaque_tank"
+    "wnir:opaque_tank",
+    "wnir:target_post"
   ]
 }

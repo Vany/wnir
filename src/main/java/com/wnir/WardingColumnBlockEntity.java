@@ -1,10 +1,13 @@
 package com.wnir;
 
+import java.util.HashSet;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import net.minecraft.core.BlockPos;
+import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.damagesource.DamageSource;
@@ -63,9 +66,22 @@ public class WardingColumnBlockEntity extends BlockEntity {
     int     hurtPostCount   = 0;
     int     silencerCount   = 0;
     int     reshaperCount   = 0;
+    int     targetPostCount = 0;
     /** Extra vertical reach (both up and down) contributed by reshaper posts. */
     double  extraVertical   = 0.0;
     boolean isBottomOfColumn = true;
+
+    /**
+     * Filter name stored by THIS specific block (only set when it is a TargetPostBlock
+     * that was renamed in an anvil). Persisted in NBT; lowercase.
+     */
+    String targetName = "";
+
+    /**
+     * Union of all targetName values from TargetPostBlock instances in this column.
+     * Empty = attack all hostiles. Computed by the bottom BE during recalcColumn().
+     */
+    Set<String> targetFilters = Set.of();
 
     /**
      * UUID of the player who placed any block in this column.
@@ -141,7 +157,7 @@ public class WardingColumnBlockEntity extends BlockEntity {
         WardingColumnBlockEntity be
     ) {
         if (!be.isBottomOfColumn) return;
-        if (!be.hasRepel && be.hurtPostCount == 0) return;
+        if (!be.hasRepel && be.hurtPostCount == 0 && be.targetPostCount == 0) return;
         if (++be.tickCounter < TICK_INTERVAL) return;
         be.tickCounter = 0;
 
@@ -175,6 +191,31 @@ public class WardingColumnBlockEntity extends BlockEntity {
                 : level.damageSources().magic();
             for (Mob mob : level.getEntitiesOfClass(Mob.class, area, m -> m instanceof Enemy)) {
                 mob.hurt(src, damage);
+            }
+        }
+
+        if (be.targetPostCount > 0) {
+            float damage = HURT_DAMAGE * be.targetPostCount;
+            Player installer = be.installerUUID != null
+                ? ((ServerLevel) level).getServer().getPlayerList().getPlayer(be.installerUUID)
+                : null;
+            DamageSource src = installer != null
+                ? level.damageSources().indirectMagic(installer, installer)
+                : level.damageSources().magic();
+            Set<String> filters = be.targetFilters;
+            if (filters.isEmpty()) {
+                // Unnamed target post: attack all hostiles (same as HurtPost)
+                for (Mob mob : level.getEntitiesOfClass(Mob.class, area, m -> m instanceof Enemy)) {
+                    mob.hurt(src, damage);
+                }
+            } else {
+                // Named target post: attack any mob of the matching entity type, hostile or not
+                for (Mob mob : level.getEntitiesOfClass(Mob.class, area)) {
+                    String typePath = BuiltInRegistries.ENTITY_TYPE.getKey(mob.getType())
+                        .getPath().toLowerCase(Locale.ROOT);
+                    if (!filters.contains(typePath)) continue;
+                    mob.hurt(src, damage);
+                }
             }
         }
     }
@@ -211,6 +252,9 @@ public class WardingColumnBlockEntity extends BlockEntity {
         int reshaperCount = ColumnHelper.countInColumn(
             level, worldPosition, exclude, WardingColumnBlock.class, ReshaperPostBlock.class
         );
+        int targetCount = ColumnHelper.countInColumn(
+            level, worldPosition, exclude, WardingColumnBlock.class, TargetPostBlock.class
+        );
 
         // HurtPostBlock contributes NO radius — damage only.
         // ReshaperPostBlock halves the radius once per post (applied N times).
@@ -226,6 +270,19 @@ public class WardingColumnBlockEntity extends BlockEntity {
         this.silencerCount = silencerCount;
         this.reshaperCount = reshaperCount;
         extraVertical      = RESHAPER_VERTICAL_BONUS * reshaperCount;
+        targetPostCount    = targetCount;
+
+        // Collect mob type filters from all TargetPostBlock BEs in column
+        if (targetCount > 0) {
+            Set<String> collected = new HashSet<>();
+            ColumnHelper.forEachInColumn(level, worldPosition, WardingColumnBlock.class,
+                WardingColumnBlockEntity.class, columnBe -> {
+                    if (!columnBe.targetName.isEmpty()) collected.add(columnBe.targetName);
+                });
+            targetFilters = collected;
+        } else {
+            targetFilters = Set.of();
+        }
 
         // Collect installer UUID from any BE in the column (bottom BE owns the result).
         UUID[] found = {installerUUID};
@@ -246,6 +303,12 @@ public class WardingColumnBlockEntity extends BlockEntity {
         setChanged();
     }
 
+    /** Called from TargetPostBlock.setPlacedBy with the lowercased mob type filter. */
+    void setTargetName(String name) {
+        this.targetName = name;
+        setChanged();
+    }
+
     // ── Persistence ───────────────────────────────────────────────────────
 
     @Override
@@ -253,12 +316,14 @@ public class WardingColumnBlockEntity extends BlockEntity {
         super.loadAdditional(input);
         String raw = input.getStringOr("installer", "");
         installerUUID = raw.isEmpty() ? null : UUID.fromString(raw);
+        targetName = input.getStringOr("target_name", "");
     }
 
     @Override
     protected void saveAdditional(ValueOutput output) {
         super.saveAdditional(output);
         if (installerUUID != null) output.putString("installer", installerUUID.toString());
+        if (!targetName.isEmpty()) output.putString("target_name", targetName);
     }
 
     // ── Lifecycle ─────────────────────────────────────────────────────────

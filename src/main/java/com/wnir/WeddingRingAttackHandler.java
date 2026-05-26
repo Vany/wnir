@@ -2,21 +2,30 @@ package com.wnir;
 
 import net.minecraft.core.component.DataComponents;
 import net.minecraft.core.registries.Registries;
+import net.minecraft.resources.Identifier;
+import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.sounds.SoundEvents;
+import net.minecraft.tags.TagKey;
+import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.Mob;
 import net.minecraft.world.entity.item.ItemEntity;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.component.BlocksAttacks;
 import net.minecraft.world.item.enchantment.Enchantments;
+import net.minecraft.world.phys.AABB;
+import net.minecraft.world.phys.Vec3;
 import net.neoforged.neoforge.event.entity.living.LivingDamageEvent;
 import net.neoforged.neoforge.event.entity.living.LivingDropsEvent;
 import net.neoforged.neoforge.event.entity.living.LivingExperienceDropEvent;
 import net.neoforged.neoforge.event.entity.living.LivingIncomingDamageEvent;
 
+import java.util.Iterator;
+import java.util.Queue;
 import java.util.UUID;
+import java.util.concurrent.ConcurrentLinkedQueue;
 
 /**
  * Handles on-hit effects for wedding ring pets:
@@ -24,6 +33,21 @@ import java.util.UUID;
  * - Shield blocking: reduce incoming damage, hurt shield durability, send "broke the shield" caption
  */
 public final class WeddingRingAttackHandler {
+
+    private static final TagKey<EntityType<?>> UNDEAD =
+        TagKey.create(Registries.ENTITY_TYPE, Identifier.fromNamespaceAndPath("minecraft", "undead"));
+    private static final TagKey<EntityType<?>> ARTHROPOD =
+        TagKey.create(Registries.ENTITY_TYPE, Identifier.fromNamespaceAndPath("minecraft", "arthropod"));
+
+    private static final double SCAN_RADIUS   = 5.0;
+    private static final int    SCAN_DELAY    = 2;  // ticks after kill before scanning
+    private static final int    MAX_ITEM_AGE  = 5;  // only pick up items ≤ this many ticks old
+
+    private record PendingScan(ServerLevel level, Vec3 pos, UUID ownerUUID, int ticksLeft) {
+        PendingScan tick() { return new PendingScan(level, pos, ownerUUID, ticksLeft - 1); }
+    }
+
+    private static final Queue<PendingScan> PENDING = new ConcurrentLinkedQueue<>();
 
     private WeddingRingAttackHandler() {}
 
@@ -41,12 +65,36 @@ public final class WeddingRingAttackHandler {
 
         if (!(attacker.level() instanceof ServerLevel sl)) return;
 
-        // Fire Aspect
         var enchRegistry = sl.registryAccess().lookupOrThrow(Registries.ENCHANTMENT);
+
+        // Fire Aspect
         int fireAspect = enchRegistry.get(Enchantments.FIRE_ASPECT)
             .map(weapon::getEnchantmentLevel).orElse(0);
         if (fireAspect > 0) {
             victim.igniteForSeconds(fireAspect * 4.0f);
+        }
+
+        // Knockback
+        int knockback = enchRegistry.get(Enchantments.KNOCKBACK)
+            .map(weapon::getEnchantmentLevel).orElse(0);
+        if (knockback > 0) {
+            victim.knockback(0.5 * knockback,
+                attacker.getX() - victim.getX(),
+                attacker.getZ() - victim.getZ());
+        }
+
+        // Smite — extra 2.5 × level damage to undead
+        int smite = enchRegistry.get(Enchantments.SMITE)
+            .map(weapon::getEnchantmentLevel).orElse(0);
+        if (smite > 0 && victim.getType().builtInRegistryHolder().is(UNDEAD)) {
+            event.setNewDamage(event.getNewDamage() + 2.5f * smite);
+        }
+
+        // Bane of Arthropods — extra 2.5 × level damage to arthropods
+        int bane = enchRegistry.get(Enchantments.BANE_OF_ARTHROPODS)
+            .map(weapon::getEnchantmentLevel).orElse(0);
+        if (bane > 0 && victim.getType().builtInRegistryHolder().is(ARTHROPOD)) {
+            event.setNewDamage(event.getNewDamage() + 2.5f * bane);
         }
 
         // Exhaustion on attack
@@ -145,7 +193,9 @@ public final class WeddingRingAttackHandler {
         // Notify LLM session
         WeddingRingLlmHandler.onPetKill(mob, event.getEntity());
 
-        // Move all drops to the owner's position
+        Vec3 deathPos = event.getEntity().position();
+
+        // Move vanilla/NeoForge drops immediately
         for (ItemEntity drop : event.getDrops()) {
             ItemStack stack = drop.getItem();
             if (stack.isEmpty()) continue;
@@ -154,5 +204,42 @@ public final class WeddingRingAttackHandler {
             sl.addFreshEntity(relocated);
         }
         event.getDrops().clear();
+
+        // Delayed scan for any modded drops spawned outside this event
+        PENDING.add(new PendingScan(sl, deathPos, data.getOwnerUUID(), SCAN_DELAY));
+    }
+
+    /**
+     * Called each server tick. Counts down pending scans and sweeps for freshly-spawned
+     * ItemEntities near each kill position once the delay expires.
+     */
+    public static void tickScans(MinecraftServer server) {
+        if (PENDING.isEmpty()) return;
+        Iterator<PendingScan> it = PENDING.iterator();
+        while (it.hasNext()) {
+            PendingScan scan = it.next();
+            it.remove();
+            int remaining = scan.ticksLeft() - 1;
+            if (remaining > 0) {
+                PENDING.add(new PendingScan(scan.level(), scan.pos(), scan.ownerUUID(), remaining));
+                continue;
+            }
+            // Time to scan
+            ServerPlayer owner = server.getPlayerList().getPlayer(scan.ownerUUID());
+            if (owner == null || !owner.isAlive()) continue;
+            Vec3 p = scan.pos();
+            AABB box = new AABB(p.x - SCAN_RADIUS, p.y - SCAN_RADIUS, p.z - SCAN_RADIUS,
+                                p.x + SCAN_RADIUS, p.y + SCAN_RADIUS, p.z + SCAN_RADIUS);
+            for (ItemEntity item : scan.level().getEntitiesOfClass(ItemEntity.class, box)) {
+                // Only teleport items that just spawned (age ≤ MAX_ITEM_AGE)
+                if (item.tickCount > MAX_ITEM_AGE) continue;
+                ItemStack stack = item.getItem();
+                if (stack.isEmpty()) continue;
+                item.discard();
+                ItemEntity relocated = new ItemEntity(scan.level(),
+                    owner.getX(), owner.getY(), owner.getZ(), stack.copy());
+                scan.level().addFreshEntity(relocated);
+            }
+        }
     }
 }
